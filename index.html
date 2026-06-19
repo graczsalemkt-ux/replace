@@ -113,7 +113,7 @@ const waitForFirebase = (cb) => {
     if (window._firebaseReady) cb();
     else window.addEventListener('firebaseReady', cb, { once: true });
 };
-const dbRef  = (path) => window._firebaseRef(window._firebaseDb, path);
+const dbRef  = (path) => window._firebaseRef(path);
 const dbSet  = (path, val) => window._firebaseSet(dbRef(path), val);
 const dbUpd  = (path, val) => window._firebaseUpdate(dbRef(path), val);
 const dbOn   = (path, cb) => window._firebaseOnValue(dbRef(path), snap => cb(snap.val()));
