@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gracz Replace - Online</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue, update, get, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCzvDunr2Fc6wFWud663I7gIyQD5mpImak",
+            authDomain: "graczreplace.firebaseapp.com",
+            databaseURL: "https://graczreplace-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "graczreplace",
+            storageBucket: "graczreplace.firebasestorage.app",
+            messagingSenderId: "607999774286",
+            appId: "1:607999774286:web:70cc5de78bbc49eebc7d1f"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        window._firebaseDb = db;
+        window._firebaseRef = ref;
+        window._firebaseSet = set;
+        window._firebaseOnValue = onValue;
+        window._firebaseUpdate = update;
+        window._firebaseGet = get;
+        window._firebaseRunTransaction = runTransaction;
+        window._firebaseReady = true;
+        window.dispatchEvent(new Event('firebaseReady'));
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Kanit', sans-serif; background: #f0f4f0; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        .scene { width: 80px; height: 80px; perspective: 600px; margin: 15px auto; }
+        .dice { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 1.2s cubic-bezier(0.15, 0.85, 0.35, 1.2); }
+        .dice-face { position: absolute; width: 80px; height: 80px; background: white; border: 2px solid #eee; border-radius: 14px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); padding: 8px; box-sizing: border-box; box-shadow: inset 0 0 10px rgba(0,0,0,0.05), 0 4px 10px rgba(0,0,0,0.1); }
+        .dot { width: 12px; height: 12px; background-color: #333; border-radius: 50%; align-self: center; justify-self: center; box-shadow: inset 0 1px 3px rgba(0,0,0,0.3); }
+        .dot.red { background-color: #e11d48; }
+        .face-1 { transform: rotateY(0deg) translateZ(40px); }
+        .face-2 { transform: rotateY(90deg) translateZ(40px); }
+        .face-3 { transform: rotateX(90deg) translateZ(40px); }
+        .face-4 { transform: rotateX(-90deg) translateZ(40px); }
+        .face-5 { transform: rotateY(-90deg) translateZ(40px); }
+        .face-6 { transform: rotateY(180deg) translateZ(40px); }
+        @keyframes random-roll { 0% { transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg); } 100% { transform: rotateX(720deg) rotateY(450deg) rotateZ(225deg); } }
+        .dice.rolling { animation: random-roll 0.3s infinite linear; }
+        .log-container { background: rgba(45, 90, 39, 0.95); backdrop-filter: blur(10px); }
+        html, body { overflow-x: hidden; width: 100%; height: 100%; position: fixed; }
+        #root { height: 100%; overflow-y: auto; }
+        @keyframes tileZoomIn { 0% { transform: scale(0.5); opacity: 0; } 65% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes tileZoomOut { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(0.5); opacity: 0; } }
+        .tile-zoom-enter { animation: tileZoomIn 0.35s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+        .tile-zoom-exit  { animation: tileZoomOut 0.25s ease-in forwards; }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+        .animate-pulse { animation: pulse 2s infinite; }
+        @keyframes sparkle-rotate { 0% { transform: rotate(0deg) scale(1); opacity:1; } 50% { transform: rotate(180deg) scale(1.15); opacity:0.8; } 100% { transform: rotate(360deg) scale(1); opacity:1; } }
+        @keyframes sparkle-ping { 0%,100% { transform: scale(1); opacity:0.9; } 50% { transform: scale(1.3); opacity:0.4; } }
+        .sparkle-ring { position:absolute; inset:-18px; border-radius:50%; pointer-events:none; animation: sparkle-ping 1.2s ease-in-out infinite; }
+        .sparkle-star { position:absolute; font-size:18px; animation: sparkle-rotate 2s linear infinite; transform-origin: center; }
+        .finish-glow { box-shadow: 0 0 0 6px rgba(251,191,36,0.5), 0 0 30px 10px rgba(251,191,36,0.35), 0 0 60px 20px rgba(251,191,36,0.15); }
+        @keyframes boxBounce { 0%,100%{transform:translateY(0) scale(1);} 30%{transform:translateY(-18px) scale(1.08);} 60%{transform:translateY(-8px) scale(1.03);} }
+        @keyframes boxShake { 0%,100%{transform:rotate(0deg);} 20%{transform:rotate(-8deg);} 40%{transform:rotate(8deg);} 60%{transform:rotate(-5deg);} 80%{transform:rotate(5deg);} }
+        @keyframes lidOpen { 0%{transform:rotateX(0deg);transform-origin:bottom;} 100%{transform:rotateX(-120deg);transform-origin:bottom;} }
+        @keyframes couponSlideUp { 0%{transform:translateY(40px);opacity:0;} 100%{transform:translateY(0);opacity:1;} }
+        @keyframes confettiFall { 0%{transform:translateY(-20px) rotate(0deg);opacity:1;} 100%{transform:translateY(300px) rotate(720deg);opacity:0;} }
+        @keyframes glowPulse { 0%,100%{box-shadow:0 0 15px 3px rgba(251,191,36,0.6);} 50%{box-shadow:0 0 30px 8px rgba(251,191,36,0.9);} }
+        .box-bounce { animation: boxBounce 1s ease-in-out infinite; }
+        .box-shake  { animation: boxShake 0.5s ease-in-out; }
+        .lid-open   { animation: lidOpen 0.4s ease-out forwards; }
+        .coupon-slide { animation: couponSlideUp 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+        .coupon-glow  { animation: glowPulse 1.5s ease-in-out infinite; }
+        @keyframes shimmer { 0%{background-position:-200% center;} 100%{background-position:200% center;} }
+        .shimmer-text { background: linear-gradient(90deg, #fbbf24, #fff, #fbbf24); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shimmer 2s linear infinite; }
+    </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ── Firebase helpers ──
+const waitForFirebase = (cb) => {
+    if (window._firebaseReady) cb();
+    else window.addEventListener('firebaseReady', cb, { once: true });
+};
+const dbRef  = (path) => window._firebaseRef(window._firebaseDb, path);
+const dbSet  = (path, val) => window._firebaseSet(dbRef(path), val);
+const dbUpd  = (path, val) => window._firebaseUpdate(dbRef(path), val);
+const dbOn   = (path, cb) => window._firebaseOnValue(dbRef(path), snap => cb(snap.val()));
+const dbGet  = (path) => window._firebaseGet(dbRef(path)).then(s => s.val());
+const dbTx   = (path, fn) => window._firebaseRunTransaction(dbRef(path), fn);
+
+// ── Helpers ──
+const randomCode = () => Math.random().toString(36).substring(2,7).toUpperCase();
+
+const boardImage = "https://drive.google.com/thumbnail?id=1MBH9nsWbtH8h6vq1svojC2DUd7NXbT6X&sz=w1600";
+
+// ── Shop Coupon System ──
+// Code pools สมมุติ (เปลี่ยนเป็น Code จริงทีหลัง)
+const generateCodes = (prefix, count) =>
+    Array.from({length: count}, (_, i) => `${prefix}${String(i+1).padStart(4,'0')}`);
+
+const SHOPS = [
+    {
+        id: 'sukthukkham',
+        name: 'สุขทุกคำ',
+        emoji: '🍜',
+        logo: 'https://drive.google.com/thumbnail?id=1WvOCMrvZ8Nojjvk6FAxHccJf7bM_c56s&sz=w300',
+        color: '#E65100',
+        bgColor: '#FFF3E0',
+        type: 'percent',
+        discount: 'ส่วนลด 10%',
+        desc: 'ลด 10% สูงสุด 50บาท/บิล เฉพาะเมนูที่ร่วมรายการ',
+        totalStock: 1000,
+        codes: null,
+    },
+    {
+        id: 'doitung',
+        name: 'ดอยตุง',
+        emoji: '☕',
+        logo: 'https://drive.google.com/thumbnail?id=1MeEgeO9FNpold57CrSK5FvQCocpOMLlK&sz=w300',
+        color: '#4E342E',
+        bgColor: '#EFEBE9',
+        type: 'percent',
+        discount: 'Gift Voucher 100 บาท',
+        desc: 'ใช้ที่คาเฟ่ดอยตุงทุกสาขา จำกัด 1 สิทธิ์/1 ใบเสร็จ เมื่อมียอดซื้อขั้นต่ำ 100 บาท',
+        totalStock: 30,
+        codes: null,
+    },
+    {
+        id: 'shopee',
+        name: 'Shopee',
+        emoji: '🛍️',
+        logo: 'https://drive.google.com/thumbnail?id=1FqTb963Wt0F9tkOUbphReY1FAa2GLd--&sz=w300',
+        color: '#EE4D2D',
+        bgColor: '#FFF0ED',
+        type: 'code',
+        discount: 'Code ส่วนลด',
+        desc: 'Code ส่วนลด ใช้ได้เลย 1 สิทธิ์/คน',
+        totalStock: 1000,
+        codes: Array(1000).fill("GRAC66778"),
+    },
+    {
+        id: 'lazada',
+        name: 'Lazada',
+        emoji: '📦',
+        logo: 'https://drive.google.com/thumbnail?id=12l9uQe2wy0JsuSs88_pyMtLQoB5XpXKq&sz=w300',
+        qrCode: 'https://drive.google.com/thumbnail?id=1eonpXGH1Rz63xky-ORSJAeyEX8eL-xPs&sz=w400',
+        color: '#0F146D',
+        bgColor: '#E8EAF6',
+        type: 'qr',
+        discount: 'แสกน QR Code รับส่วนลด',
+        desc: 'Code ส่วนลด ใช้ได้เลย 1 สิทธิ์/คน',
+        totalStock: 1000,
+        codes: ["GraczrepLz000123", "GraczrepLz000223", "GraczrepLz000323", "GraczrepLz000423", "GraczrepLz000523", "GraczrepLz000623", "GraczrepLz000723", "GraczrepLz000823", "GraczrepLz000923", "GraczrepLz001023", "GraczrepLz001123", "GraczrepLz001223", "GraczrepLz001323", "GraczrepLz001423", "GraczrepLz001523", "GraczrepLz001623", "GraczrepLz001723", "GraczrepLz001823", "GraczrepLz001923", "GraczrepLz002023", "GraczrepLz002123", "GraczrepLz002223", "GraczrepLz002323", "GraczrepLz002423", "GraczrepLz002523", "GraczrepLz002623", "GraczrepLz002723", "GraczrepLz002823", "GraczrepLz002923", "GraczrepLz003023", "GraczrepLz003123", "GraczrepLz003223", "GraczrepLz003323", "GraczrepLz003423", "GraczrepLz003523", "GraczrepLz003623", "GraczrepLz003723", "GraczrepLz003823", "GraczrepLz003923", "GraczrepLz004023", "GraczrepLz004123", "GraczrepLz004223", "GraczrepLz004323", "GraczrepLz004423", "GraczrepLz004523", "GraczrepLz004623", "GraczrepLz004723", "GraczrepLz004823", "GraczrepLz004923", "GraczrepLz005023", "GraczrepLz005123", "GraczrepLz005223", "GraczrepLz005323", "GraczrepLz005423", "GraczrepLz005523", "GraczrepLz005623", "GraczrepLz005723", "GraczrepLz005823", "GraczrepLz005923", "GraczrepLz006023", "GraczrepLz006123", "GraczrepLz006223", "GraczrepLz006323", "GraczrepLz006423", "GraczrepLz006523", "GraczrepLz006623", "GraczrepLz006723", "GraczrepLz006823", "GraczrepLz006923", "GraczrepLz007023", "GraczrepLz007123", "GraczrepLz007223", "GraczrepLz007323", "GraczrepLz007423", "GraczrepLz007523", "GraczrepLz007623", "GraczrepLz007723", "GraczrepLz007823", "GraczrepLz007923", "GraczrepLz008023", "GraczrepLz008123", "GraczrepLz008223", "GraczrepLz008323", "GraczrepLz008423", "GraczrepLz008523", "GraczrepLz008623", "GraczrepLz008723", "GraczrepLz008823", "GraczrepLz008923", "GraczrepLz009023", "GraczrepLz009123", "GraczrepLz009223", "GraczrepLz009323", "GraczrepLz009423", "GraczrepLz009523", "GraczrepLz009623", "GraczrepLz009723", "GraczrepLz009823", "GraczrepLz009923", "GraczrepLz010023", "GraczrepLz010123", "GraczrepLz010223", "GraczrepLz010323", "GraczrepLz010423", "GraczrepLz010523", "GraczrepLz010623", "GraczrepLz010723", "GraczrepLz010823", "GraczrepLz010923", "GraczrepLz011023", "GraczrepLz011123", "GraczrepLz011223", "GraczrepLz011323", "GraczrepLz011423", "GraczrepLz011523", "GraczrepLz011623", "GraczrepLz011723", "GraczrepLz011823", "GraczrepLz011923", "GraczrepLz012023", "GraczrepLz012123", "GraczrepLz012223", "GraczrepLz012323", "GraczrepLz012423", "GraczrepLz012523", "GraczrepLz012623", "GraczrepLz012723", "GraczrepLz012823", "GraczrepLz012923", "GraczrepLz013023", "GraczrepLz013123", "GraczrepLz013223", "GraczrepLz013323", "GraczrepLz013423", "GraczrepLz013523", "GraczrepLz013623", "GraczrepLz013723", "GraczrepLz013823", "GraczrepLz013923", "GraczrepLz014023", "GraczrepLz014123", "GraczrepLz014223", "GraczrepLz014323", "GraczrepLz014423", "GraczrepLz014523", "GraczrepLz014623", "GraczrepLz014723", "GraczrepLz014823", "GraczrepLz014923", "GraczrepLz015023", "GraczrepLz015123", "GraczrepLz015223", "GraczrepLz015323", "GraczrepLz015423", "GraczrepLz015523", "GraczrepLz015623", "GraczrepLz015723", "GraczrepLz015823", "GraczrepLz015923", "GraczrepLz016023", "GraczrepLz016123", "GraczrepLz016223", "GraczrepLz016323", "GraczrepLz016423", "GraczrepLz016523", "GraczrepLz016623", "GraczrepLz016723", "GraczrepLz016823", "GraczrepLz016923", "GraczrepLz017023", "GraczrepLz017123", "GraczrepLz017223", "GraczrepLz017323", "GraczrepLz017423", "GraczrepLz017523", "GraczrepLz017623", "GraczrepLz017723", "GraczrepLz017823", "GraczrepLz017923", "GraczrepLz018023", "GraczrepLz018123", "GraczrepLz018223", "GraczrepLz018323", "GraczrepLz018423", "GraczrepLz018523", "GraczrepLz018623", "GraczrepLz018723", "GraczrepLz018823", "GraczrepLz018923", "GraczrepLz019023", "GraczrepLz019123", "GraczrepLz019223", "GraczrepLz019323", "GraczrepLz019423", "GraczrepLz019523", "GraczrepLz019623", "GraczrepLz019723", "GraczrepLz019823", "GraczrepLz019923", "GraczrepLz020023", "GraczrepLz020123", "GraczrepLz020223", "GraczrepLz020323", "GraczrepLz020423", "GraczrepLz020523", "GraczrepLz020623", "GraczrepLz020723", "GraczrepLz020823", "GraczrepLz020923", "GraczrepLz021023", "GraczrepLz021123", "GraczrepLz021223", "GraczrepLz021323", "GraczrepLz021423", "GraczrepLz021523", "GraczrepLz021623", "GraczrepLz021723", "GraczrepLz021823", "GraczrepLz021923", "GraczrepLz022023", "GraczrepLz022123", "GraczrepLz022223", "GraczrepLz022323", "GraczrepLz022423", "GraczrepLz022523", "GraczrepLz022623", "GraczrepLz022723", "GraczrepLz022823", "GraczrepLz022923", "GraczrepLz023023", "GraczrepLz023123", "GraczrepLz023223", "GraczrepLz023323", "GraczrepLz023423", "GraczrepLz023523", "GraczrepLz023623", "GraczrepLz023723", "GraczrepLz023823", "GraczrepLz023923", "GraczrepLz024023", "GraczrepLz024123", "GraczrepLz024223", "GraczrepLz024323", "GraczrepLz024423", "GraczrepLz024523", "GraczrepLz024623", "GraczrepLz024723", "GraczrepLz024823", "GraczrepLz024923", "GraczrepLz025023", "GraczrepLz025123", "GraczrepLz025223", "GraczrepLz025323", "GraczrepLz025423", "GraczrepLz025523", "GraczrepLz025623", "GraczrepLz025723", "GraczrepLz025823", "GraczrepLz025923", "GraczrepLz026023", "GraczrepLz026123", "GraczrepLz026223", "GraczrepLz026323", "GraczrepLz026423", "GraczrepLz026523", "GraczrepLz026623", "GraczrepLz026723", "GraczrepLz026823", "GraczrepLz026923", "GraczrepLz027023", "GraczrepLz027123", "GraczrepLz027223", "GraczrepLz027323", "GraczrepLz027423", "GraczrepLz027523", "GraczrepLz027623", "GraczrepLz027723", "GraczrepLz027823", "GraczrepLz027923", "GraczrepLz028023", "GraczrepLz028123", "GraczrepLz028223", "GraczrepLz028323", "GraczrepLz028423", "GraczrepLz028523", "GraczrepLz028623", "GraczrepLz028723", "GraczrepLz028823", "GraczrepLz028923", "GraczrepLz029023", "GraczrepLz029123", "GraczrepLz029223", "GraczrepLz029323", "GraczrepLz029423", "GraczrepLz029523", "GraczrepLz029623", "GraczrepLz029723", "GraczrepLz029823", "GraczrepLz029923", "GraczrepLz030023", "GraczrepLz030123", "GraczrepLz030223", "GraczrepLz030323", "GraczrepLz030423", "GraczrepLz030523", "GraczrepLz030623", "GraczrepLz030723", "GraczrepLz030823", "GraczrepLz030923", "GraczrepLz031023", "GraczrepLz031123", "GraczrepLz031223", "GraczrepLz031323", "GraczrepLz031423", "GraczrepLz031523", "GraczrepLz031623", "GraczrepLz031723", "GraczrepLz031823", "GraczrepLz031923", "GraczrepLz032023", "GraczrepLz032123", "GraczrepLz032223", "GraczrepLz032323", "GraczrepLz032423", "GraczrepLz032523", "GraczrepLz032623", "GraczrepLz032723", "GraczrepLz032823", "GraczrepLz032923", "GraczrepLz033023", "GraczrepLz033123", "GraczrepLz033223", "GraczrepLz033323", "GraczrepLz033423", "GraczrepLz033523", "GraczrepLz033623", "GraczrepLz033723", "GraczrepLz033823", "GraczrepLz033923", "GraczrepLz034023", "GraczrepLz034123", "GraczrepLz034223", "GraczrepLz034323", "GraczrepLz034423", "GraczrepLz034523", "GraczrepLz034623", "GraczrepLz034723", "GraczrepLz034823", "GraczrepLz034923", "GraczrepLz035023", "GraczrepLz035123", "GraczrepLz035223", "GraczrepLz035323", "GraczrepLz035423", "GraczrepLz035523", "GraczrepLz035623", "GraczrepLz035723", "GraczrepLz035823", "GraczrepLz035923", "GraczrepLz036023", "GraczrepLz036123", "GraczrepLz036223", "GraczrepLz036323", "GraczrepLz036423", "GraczrepLz036523", "GraczrepLz036623", "GraczrepLz036723", "GraczrepLz036823", "GraczrepLz036923", "GraczrepLz037023", "GraczrepLz037123", "GraczrepLz037223", "GraczrepLz037323", "GraczrepLz037423", "GraczrepLz037523", "GraczrepLz037623", "GraczrepLz037723", "GraczrepLz037823", "GraczrepLz037923", "GraczrepLz038023", "GraczrepLz038123", "GraczrepLz038223", "GraczrepLz038323", "GraczrepLz038423", "GraczrepLz038523", "GraczrepLz038623", "GraczrepLz038723", "GraczrepLz038823", "GraczrepLz038923", "GraczrepLz039023", "GraczrepLz039123", "GraczrepLz039223", "GraczrepLz039323", "GraczrepLz039423", "GraczrepLz039523", "GraczrepLz039623", "GraczrepLz039723", "GraczrepLz039823", "GraczrepLz039923", "GraczrepLz040023", "GraczrepLz040123", "GraczrepLz040223", "GraczrepLz040323", "GraczrepLz040423", "GraczrepLz040523", "GraczrepLz040623", "GraczrepLz040723", "GraczrepLz040823", "GraczrepLz040923", "GraczrepLz041023", "GraczrepLz041123", "GraczrepLz041223", "GraczrepLz041323", "GraczrepLz041423", "GraczrepLz041523", "GraczrepLz041623", "GraczrepLz041723", "GraczrepLz041823", "GraczrepLz041923", "GraczrepLz042023", "GraczrepLz042123", "GraczrepLz042223", "GraczrepLz042323", "GraczrepLz042423", "GraczrepLz042523", "GraczrepLz042623", "GraczrepLz042723", "GraczrepLz042823", "GraczrepLz042923", "GraczrepLz043023", "GraczrepLz043123", "GraczrepLz043223", "GraczrepLz043323", "GraczrepLz043423", "GraczrepLz043523", "GraczrepLz043623", "GraczrepLz043723", "GraczrepLz043823", "GraczrepLz043923", "GraczrepLz044023", "GraczrepLz044123", "GraczrepLz044223", "GraczrepLz044323", "GraczrepLz044423", "GraczrepLz044523", "GraczrepLz044623", "GraczrepLz044723", "GraczrepLz044823", "GraczrepLz044923", "GraczrepLz045023", "GraczrepLz045123", "GraczrepLz045223", "GraczrepLz045323", "GraczrepLz045423", "GraczrepLz045523", "GraczrepLz045623", "GraczrepLz045723", "GraczrepLz045823", "GraczrepLz045923", "GraczrepLz046023", "GraczrepLz046123", "GraczrepLz046223", "GraczrepLz046323", "GraczrepLz046423", "GraczrepLz046523", "GraczrepLz046623", "GraczrepLz046723", "GraczrepLz046823", "GraczrepLz046923", "GraczrepLz047023", "GraczrepLz047123", "GraczrepLz047223", "GraczrepLz047323", "GraczrepLz047423", "GraczrepLz047523", "GraczrepLz047623", "GraczrepLz047723", "GraczrepLz047823", "GraczrepLz047923", "GraczrepLz048023", "GraczrepLz048123", "GraczrepLz048223", "GraczrepLz048323", "GraczrepLz048423", "GraczrepLz048523", "GraczrepLz048623", "GraczrepLz048723", "GraczrepLz048823", "GraczrepLz048923", "GraczrepLz049023", "GraczrepLz049123", "GraczrepLz049223", "GraczrepLz049323", "GraczrepLz049423", "GraczrepLz049523", "GraczrepLz049623", "GraczrepLz049723", "GraczrepLz049823", "GraczrepLz049923", "GraczrepLz050023", "GraczrepLz050123", "GraczrepLz050223", "GraczrepLz050323", "GraczrepLz050423", "GraczrepLz050523", "GraczrepLz050623", "GraczrepLz050723", "GraczrepLz050823", "GraczrepLz050923", "GraczrepLz051023", "GraczrepLz051123", "GraczrepLz051223", "GraczrepLz051323", "GraczrepLz051423", "GraczrepLz051523", "GraczrepLz051623", "GraczrepLz051723", "GraczrepLz051823", "GraczrepLz051923", "GraczrepLz052023", "GraczrepLz052123", "GraczrepLz052223", "GraczrepLz052323", "GraczrepLz052423", "GraczrepLz052523", "GraczrepLz052623", "GraczrepLz052723", "GraczrepLz052823", "GraczrepLz052923", "GraczrepLz053023", "GraczrepLz053123", "GraczrepLz053223", "GraczrepLz053323", "GraczrepLz053423", "GraczrepLz053523", "GraczrepLz053623", "GraczrepLz053723", "GraczrepLz053823", "GraczrepLz053923", "GraczrepLz054023", "GraczrepLz054123", "GraczrepLz054223", "GraczrepLz054323", "GraczrepLz054423", "GraczrepLz054523", "GraczrepLz054623", "GraczrepLz054723", "GraczrepLz054823", "GraczrepLz054923", "GraczrepLz055023", "GraczrepLz055123", "GraczrepLz055223", "GraczrepLz055323", "GraczrepLz055423", "GraczrepLz055523", "GraczrepLz055623", "GraczrepLz055723", "GraczrepLz055823", "GraczrepLz055923", "GraczrepLz056023", "GraczrepLz056123", "GraczrepLz056223", "GraczrepLz056323", "GraczrepLz056423", "GraczrepLz056523", "GraczrepLz056623", "GraczrepLz056723", "GraczrepLz056823", "GraczrepLz056923", "GraczrepLz057023", "GraczrepLz057123", "GraczrepLz057223", "GraczrepLz057323", "GraczrepLz057423", "GraczrepLz057523", "GraczrepLz057623", "GraczrepLz057723", "GraczrepLz057823", "GraczrepLz057923", "GraczrepLz058023", "GraczrepLz058123", "GraczrepLz058223", "GraczrepLz058323", "GraczrepLz058423", "GraczrepLz058523", "GraczrepLz058623", "GraczrepLz058723", "GraczrepLz058823", "GraczrepLz058923", "GraczrepLz059023", "GraczrepLz059123", "GraczrepLz059223", "GraczrepLz059323", "GraczrepLz059423", "GraczrepLz059523", "GraczrepLz059623", "GraczrepLz059723", "GraczrepLz059823", "GraczrepLz059923", "GraczrepLz060023", "GraczrepLz060123", "GraczrepLz060223", "GraczrepLz060323", "GraczrepLz060423", "GraczrepLz060523", "GraczrepLz060623", "GraczrepLz060723", "GraczrepLz060823", "GraczrepLz060923", "GraczrepLz061023", "GraczrepLz061123", "GraczrepLz061223", "GraczrepLz061323", "GraczrepLz061423", "GraczrepLz061523", "GraczrepLz061623", "GraczrepLz061723", "GraczrepLz061823", "GraczrepLz061923", "GraczrepLz062023", "GraczrepLz062123", "GraczrepLz062223", "GraczrepLz062323", "GraczrepLz062423", "GraczrepLz062523", "GraczrepLz062623", "GraczrepLz062723", "GraczrepLz062823", "GraczrepLz062923", "GraczrepLz063023", "GraczrepLz063123", "GraczrepLz063223", "GraczrepLz063323", "GraczrepLz063423", "GraczrepLz063523", "GraczrepLz063623", "GraczrepLz063723", "GraczrepLz063823", "GraczrepLz063923", "GraczrepLz064023", "GraczrepLz064123", "GraczrepLz064223", "GraczrepLz064323", "GraczrepLz064423", "GraczrepLz064523", "GraczrepLz064623", "GraczrepLz064723", "GraczrepLz064823", "GraczrepLz064923", "GraczrepLz065023", "GraczrepLz065123", "GraczrepLz065223", "GraczrepLz065323", "GraczrepLz065423", "GraczrepLz065523", "GraczrepLz065623", "GraczrepLz065723", "GraczrepLz065823", "GraczrepLz065923", "GraczrepLz066023", "GraczrepLz066123", "GraczrepLz066223", "GraczrepLz066323", "GraczrepLz066423", "GraczrepLz066523", "GraczrepLz066623", "GraczrepLz066723", "GraczrepLz066823", "GraczrepLz066923", "GraczrepLz067023", "GraczrepLz067123", "GraczrepLz067223", "GraczrepLz067323", "GraczrepLz067423", "GraczrepLz067523", "GraczrepLz067623", "GraczrepLz067723", "GraczrepLz067823", "GraczrepLz067923", "GraczrepLz068023", "GraczrepLz068123", "GraczrepLz068223", "GraczrepLz068323", "GraczrepLz068423", "GraczrepLz068523", "GraczrepLz068623", "GraczrepLz068723", "GraczrepLz068823", "GraczrepLz068923", "GraczrepLz069023", "GraczrepLz069123", "GraczrepLz069223", "GraczrepLz069323", "GraczrepLz069423", "GraczrepLz069523", "GraczrepLz069623", "GraczrepLz069723", "GraczrepLz069823", "GraczrepLz069923", "GraczrepLz070023", "GraczrepLz070123", "GraczrepLz070223", "GraczrepLz070323", "GraczrepLz070423", "GraczrepLz070523", "GraczrepLz070623", "GraczrepLz070723", "GraczrepLz070823", "GraczrepLz070923", "GraczrepLz071023", "GraczrepLz071123", "GraczrepLz071223", "GraczrepLz071323", "GraczrepLz071423", "GraczrepLz071523", "GraczrepLz071623", "GraczrepLz071723", "GraczrepLz071823", "GraczrepLz071923", "GraczrepLz072023", "GraczrepLz072123", "GraczrepLz072223", "GraczrepLz072323", "GraczrepLz072423", "GraczrepLz072523", "GraczrepLz072623", "GraczrepLz072723", "GraczrepLz072823", "GraczrepLz072923", "GraczrepLz073023", "GraczrepLz073123", "GraczrepLz073223", "GraczrepLz073323", "GraczrepLz073423", "GraczrepLz073523", "GraczrepLz073623", "GraczrepLz073723", "GraczrepLz073823", "GraczrepLz073923", "GraczrepLz074023", "GraczrepLz074123", "GraczrepLz074223", "GraczrepLz074323", "GraczrepLz074423", "GraczrepLz074523", "GraczrepLz074623", "GraczrepLz074723", "GraczrepLz074823", "GraczrepLz074923", "GraczrepLz075023", "GraczrepLz075123", "GraczrepLz075223", "GraczrepLz075323", "GraczrepLz075423", "GraczrepLz075523", "GraczrepLz075623", "GraczrepLz075723", "GraczrepLz075823", "GraczrepLz075923", "GraczrepLz076023", "GraczrepLz076123", "GraczrepLz076223", "GraczrepLz076323", "GraczrepLz076423", "GraczrepLz076523", "GraczrepLz076623", "GraczrepLz076723", "GraczrepLz076823", "GraczrepLz076923", "GraczrepLz077023", "GraczrepLz077123", "GraczrepLz077223", "GraczrepLz077323", "GraczrepLz077423", "GraczrepLz077523", "GraczrepLz077623", "GraczrepLz077723", "GraczrepLz077823", "GraczrepLz077923", "GraczrepLz078023", "GraczrepLz078123", "GraczrepLz078223", "GraczrepLz078323", "GraczrepLz078423", "GraczrepLz078523", "GraczrepLz078623", "GraczrepLz078723", "GraczrepLz078823", "GraczrepLz078923", "GraczrepLz079023", "GraczrepLz079123", "GraczrepLz079223", "GraczrepLz079323", "GraczrepLz079423", "GraczrepLz079523", "GraczrepLz079623", "GraczrepLz079723", "GraczrepLz079823", "GraczrepLz079923", "GraczrepLz080023", "GraczrepLz080123", "GraczrepLz080223", "GraczrepLz080323", "GraczrepLz080423", "GraczrepLz080523", "GraczrepLz080623", "GraczrepLz080723", "GraczrepLz080823", "GraczrepLz080923", "GraczrepLz081023", "GraczrepLz081123", "GraczrepLz081223", "GraczrepLz081323", "GraczrepLz081423", "GraczrepLz081523", "GraczrepLz081623", "GraczrepLz081723", "GraczrepLz081823", "GraczrepLz081923", "GraczrepLz082023", "GraczrepLz082123", "GraczrepLz082223", "GraczrepLz082323", "GraczrepLz082423", "GraczrepLz082523", "GraczrepLz082623", "GraczrepLz082723", "GraczrepLz082823", "GraczrepLz082923", "GraczrepLz083023", "GraczrepLz083123", "GraczrepLz083223", "GraczrepLz083323", "GraczrepLz083423", "GraczrepLz083523", "GraczrepLz083623", "GraczrepLz083723", "GraczrepLz083823", "GraczrepLz083923", "GraczrepLz084023", "GraczrepLz084123", "GraczrepLz084223", "GraczrepLz084323", "GraczrepLz084423", "GraczrepLz084523", "GraczrepLz084623", "GraczrepLz084723", "GraczrepLz084823", "GraczrepLz084923", "GraczrepLz085023", "GraczrepLz085123", "GraczrepLz085223", "GraczrepLz085323", "GraczrepLz085423", "GraczrepLz085523", "GraczrepLz085623", "GraczrepLz085723", "GraczrepLz085823", "GraczrepLz085923", "GraczrepLz086023", "GraczrepLz086123", "GraczrepLz086223", "GraczrepLz086323", "GraczrepLz086423", "GraczrepLz086523", "GraczrepLz086623", "GraczrepLz086723", "GraczrepLz086823", "GraczrepLz086923", "GraczrepLz087023", "GraczrepLz087123", "GraczrepLz087223", "GraczrepLz087323", "GraczrepLz087423", "GraczrepLz087523", "GraczrepLz087623", "GraczrepLz087723", "GraczrepLz087823", "GraczrepLz087923", "GraczrepLz088023", "GraczrepLz088123", "GraczrepLz088223", "GraczrepLz088323", "GraczrepLz088423", "GraczrepLz088523", "GraczrepLz088623", "GraczrepLz088723", "GraczrepLz088823", "GraczrepLz088923", "GraczrepLz089023", "GraczrepLz089123", "GraczrepLz089223", "GraczrepLz089323", "GraczrepLz089423", "GraczrepLz089523", "GraczrepLz089623", "GraczrepLz089723", "GraczrepLz089823", "GraczrepLz089923", "GraczrepLz090023", "GraczrepLz090123", "GraczrepLz090223", "GraczrepLz090323", "GraczrepLz090423", "GraczrepLz090523", "GraczrepLz090623", "GraczrepLz090723", "GraczrepLz090823", "GraczrepLz090923", "GraczrepLz091023", "GraczrepLz091123", "GraczrepLz091223", "GraczrepLz091323", "GraczrepLz091423", "GraczrepLz091523", "GraczrepLz091623", "GraczrepLz091723", "GraczrepLz091823", "GraczrepLz091923", "GraczrepLz092023", "GraczrepLz092123", "GraczrepLz092223", "GraczrepLz092323", "GraczrepLz092423", "GraczrepLz092523", "GraczrepLz092623", "GraczrepLz092723", "GraczrepLz092823", "GraczrepLz092923", "GraczrepLz093023", "GraczrepLz093123", "GraczrepLz093223", "GraczrepLz093323", "GraczrepLz093423", "GraczrepLz093523", "GraczrepLz093623", "GraczrepLz093723", "GraczrepLz093823", "GraczrepLz093923", "GraczrepLz094023", "GraczrepLz094123", "GraczrepLz094223", "GraczrepLz094323", "GraczrepLz094423", "GraczrepLz094523", "GraczrepLz094623", "GraczrepLz094723", "GraczrepLz094823", "GraczrepLz094923", "GraczrepLz095023", "GraczrepLz095123", "GraczrepLz095223", "GraczrepLz095323", "GraczrepLz095423", "GraczrepLz095523", "GraczrepLz095623", "GraczrepLz095723", "GraczrepLz095823", "GraczrepLz095923", "GraczrepLz096023", "GraczrepLz096123", "GraczrepLz096223", "GraczrepLz096323", "GraczrepLz096423", "GraczrepLz096523", "GraczrepLz096623", "GraczrepLz096723", "GraczrepLz096823", "GraczrepLz096923", "GraczrepLz097023", "GraczrepLz097123", "GraczrepLz097223", "GraczrepLz097323", "GraczrepLz097423", "GraczrepLz097523", "GraczrepLz097623", "GraczrepLz097723", "GraczrepLz097823", "GraczrepLz097923", "GraczrepLz098023", "GraczrepLz098123", "GraczrepLz098223", "GraczrepLz098323", "GraczrepLz098423", "GraczrepLz098523", "GraczrepLz098623", "GraczrepLz098723", "GraczrepLz098823", "GraczrepLz098923", "GraczrepLz099023", "GraczrepLz099123", "GraczrepLz099223", "GraczrepLz099323", "GraczrepLz099423", "GraczrepLz099523", "GraczrepLz099623", "GraczrepLz099723", "GraczrepLz099823", "GraczrepLz099923", "GraczrepLz100023"],
+    },
+    {
+        id: 'lineoa',
+        name: 'Line OA',
+        emoji: '💬',
+        logo: 'https://drive.google.com/thumbnail?id=1s6MIbQgLhQNpRFCbUGFYC6J8BGoW16YS&sz=w300',
+        color: '#06C755',
+        bgColor: '#E8F5E9',
+        type: 'code',
+        discount: 'Code ส่วนลด',
+        desc: 'Code ส่วนลดพิเศษจาก Line OA',
+        totalStock: 1000,
+        codes: generateCodes('LINE', 1000),
+    },
+];
+
+// Init stock ใน Firebase ถ้ายังไม่มี
+const initShopStock = async () => {
+    const existing = await dbGet('shopStock');
+    if (existing) return;
+    const stockData = {};
+    SHOPS.forEach(shop => {
+        stockData[shop.id] = {
+            name: shop.name,
+            totalStock: shop.totalStock,
+            remaining: shop.totalStock,
+            issued: 0,
+            enabled: true,
+            // สำหรับ code pool เก็บ index ล่าสุดที่ใช้ไป
+            codeIndex: shop.type === 'code' ? 0 : null,
+        };
+    });
+    await dbSet('shopStock', stockData);
+};
+
+// ดึงและตัด coupon 1 ใบ (transaction-safe)
+const claimCoupon = async () => {
+    const stock = await dbGet('shopStock');
+    if (!stock) return null;
+
+    // หาร้านที่ยังมี stock และเปิดใช้งานอยู่ (enabled !== false ถือว่าเปิด เป็นค่า default)
+    const available = SHOPS.filter(s => stock[s.id] && stock[s.id].remaining > 0 && stock[s.id].enabled !== false);
+    if (available.length === 0) return null;
+
+    // Random ร้าน
+    const shop = available[Math.floor(Math.random() * available.length)];
+    const shopStock = stock[shop.id];
+
+    let couponCode = null;
+    if (shop.type === 'code') {
+        const idx = shopStock.codeIndex || 0;
+        couponCode = shop.codes[idx];
+        await dbUpd(`shopStock/${shop.id}`, {
+            remaining: shopStock.remaining - 1,
+            issued: shopStock.issued + 1,
+            codeIndex: idx + 1,
+            lastIssuedAt: new Date().toISOString(),
+        });
+    } else {
+        couponCode = null;
+        await dbUpd(`shopStock/${shop.id}`, {
+            remaining: shopStock.remaining - 1,
+            issued: shopStock.issued + 1,
+            lastIssuedAt: new Date().toISOString(),
+        });
+    }
+
+    // บันทึก log การออกคูปอง
+    const logKey = `couponLogs/${Date.now()}`;
+    await dbSet(logKey, {
+        shopId: shop.id,
+        shopName: shop.name,
+        code: couponCode,
+        issuedAt: new Date().toISOString(),
+    });
+
+    return { shop, couponCode };
+};
+
+const tileCoords = [
+    { x: 11, y: 89 }, { x: 11, y: 78 }, { x: 11, y: 67 }, { x: 11, y: 56 },
+    { x: 11, y: 45 }, { x: 11, y: 34 }, { x: 11, y: 23 }, { x: 11, y: 12 },
+    { x: 22, y: 12 }, { x: 33, y: 12 }, { x: 44, y: 12 }, { x: 55, y: 12 },
+    { x: 66, y: 12 }, { x: 77, y: 12 }, { x: 89, y: 12 }, { x: 89, y: 23 },
+    { x: 89, y: 34 }, { x: 89, y: 45 }, { x: 89, y: 56 }, { x: 89, y: 67 },
+    { x: 89, y: 78 }, { x: 89, y: 89 }, { x: 78, y: 89 }, { x: 67, y: 89 },
+    { x: 56, y: 89 }, { x: 45, y: 89 }, { x: 34, y: 89 }, { x: 20, y: 89 },
+    { x: 11, y: 89 },
+];
+
+const boardTiles = [
+    { name: "START", desc: "เริ่มต้นเส้นทางผู้พิทักษ์โลก" },
+    { name: "พักดื่มน้ำ", desc: "พักดื่มน้ำครึ่งแก้วก่อนเดินต่อ" },
+    { name: "แก้วเคลือบพลาสติก", desc: "คนถัดไปมอบเงินให้ 5 บาท" },
+    { name: "พกแก้วส่วนตัว", desc: "เดินหน้า 1 ช่อง", effect: { move: 1 } },
+    { name: "แวะชมป่า", desc: "อากาศบริสุทธิ์จังเลย" },
+    { name: "ใช้กล่องโฟม", desc: "โดนปรับ 20 บาท" },
+    { name: "ชามเกรซ", desc: "กินอะไรก็ได้จากชามเกรซ" },
+    { name: "ไม่แยกขยะ", desc: "ปั่นจิ้งหรีด 5 ที!" },
+    { name: "หลอดพลาสติก", desc: "โดนดีดหน้าผาก 1 ที!" },
+    { name: "คนก่อนหน้า", desc: "อมน้ำแข็ง 10 วินาที" },
+    { name: "แวะดูปะการัง", desc: "ชมความงามใต้ท้องทะเล" },
+    { name: "ไม่รู้วิธีเข้าเวฟ", desc: "ถอยหลัง 2 ช่อง", effect: { move: -2 } },
+    { name: "ไม่รับถุงพลาสติก", desc: "เดินหน้า 1 ช่อง", effect: { move: 1 } },
+    { name: "แวะช่วยเกษตรกร", desc: "ส่งเยื่อฟางไปผลิตเกรซ" },
+    { name: "เลือก Gracz", desc: "เดินหน้า 2 ช่อง", effect: { move: 2 } },
+    { name: "พก Gracz ไปแคมป์", desc: "สั่งใครทำอะไรก็ได้ 1 อย่าง" },
+    { name: "พักดื่มน้ำ", desc: "ดื่มน้ำให้หมดแก้ว" },
+    { name: "Gracz Bonus", desc: "ทิ้งทวนให้ทุกคนคนละ 2 บาท" },
+    { name: "ทิ้งขยะไม่เป็นที่", desc: "กระโดดตบ 5 รอบ" },
+    { name: "ป้อนของเปรี้ยว", desc: "ป้อนคนตรงข้าม 1 คำ" },
+    { name: "ใส่อาหารร้อนในพลาสติก", desc: "ป่วย หยุดเล่น 2 ตา", effect: { skip: 2 } },
+    { name: "ชวนเพื่อนใช้เกรซ", desc: "เลือก 1 คน เดินหน้าไปพร้อมคุณ 1 ช่อง", effect: { invite: true } },
+    { name: "ท่องเที่ยวอนุรักษ์", desc: "ให้คนถัดไป ลุกนั่ง 5 ที" },
+    { name: "บอกความลับ", desc: "บอกความลับกับคนด้านซ้าย 1 เรื่อง" },
+    { name: "Green Hero Moment", desc: "ทุกมุมปรบมือให้คุณ" },
+    { name: "พักผ่อน", desc: "หยุดเล่น 1 ตา", effect: { skip: 1 } },
+    { name: "เติมพลัง", desc: "แวะกินขนมในจานเกรซ" },
+    { name: "FINISH", desc: "คุณคือผู้พิทักษ์โลกตัวจริง!" }
+];
+
+const gdrive = (id) => `https://drive.google.com/thumbnail?id=${id}&sz=w600`;
+const tileImages = [
+    gdrive("1iv5VkVKf11cjOKExPfk546_2JdWhK_NH"),gdrive("1tpcdb0UE_Y9anBZnzlW8S5zh1uML2n62"),
+    gdrive("18veg3wey5Ju0FVq3BGTO_5tiSAMozCjr"),gdrive("1RTEIphy66FTudZxKjIT9JsubZ0DkLA5z"),
+    gdrive("1SybFRM23GPpRHpycZuUPZochNDyDOEIQ"),gdrive("1MvrI-2T23tSl2286ECeLrS8FNhO_O-Xw"),
+    gdrive("1gYZ56iBiNu8LHEKn9kejtHOsHCKvH8GD"),gdrive("1SJjZniEaW-QOlbsX5ZsxSVTB2dcPe6gl"),
+    gdrive("1LbmwF7zGMmBODymIXTaYGQosES9iV-Rx"),gdrive("1tSGa9uKW4R2PDDpweeP-8l6DJjHm8n5a"),
+    gdrive("1tzxuHUmVyWFWLiDAZKo59Y0n7qXqREYx"),gdrive("16AqZ0oiHAQfFtjgbYE7n04QBSmVlt2wW"),
+    gdrive("1pLlQ_7FbzNaoFh5SjsHQrmAoNH84ekAB"),gdrive("1TnkqHkj_nGkoq9aYFgndvEhLefABLT2_"),
+    gdrive("1H8Ad6NiPUb8RGyncieMNbGbTSqMD9Dxv"),gdrive("1kNgALc57r3IDDPDG712DG2XWfHASvOUh"),
+    gdrive("1M0M2_heQf1pQFCWvtEBABnSQ15cQrE_b"),gdrive("18WwNZ-c-o2CYm9gDQbakq9EIoV9avrW9"),
+    gdrive("1NfA_XtOHU6RELPApXQzi82jiHlGRof-f"),gdrive("1YtjRDfNBLCrqw2tRKdzm5bB3IIuZy_87"),
+    gdrive("1Ji14jyLEno-ECpC_pdG_nhB9uQSP6yKa"),gdrive("1jaMPbZiQ1nyS8ZpKIfeGHz4HzoOGczS1"),
+    gdrive("1LfbvWQalYEz8apkuHXoxSRn7nKmydokM"),gdrive("16dd_gnBredOZel7ywg6CuMKlXILEDVpX"),
+    gdrive("10metE6fqf36CoXGqSZyA1E702C5nbL1_"),gdrive("13RNtwZcmBsoukgArmSrFQDkbLr1JbE25"),
+    gdrive("1Io9ENgXQXWziPviFLYO046kLVq9WCRKw"),gdrive("1WY0ZmwX4bu8Ucns1Nrb1wOo6nzskT7Km"),
+    gdrive("1WY0ZmwX4bu8Ucns1Nrb1wOo6nzskT7Km"),
+];
+
+const confettiColors = ['#FBC02D','#2D5A27','#0288D1','#D32F2F','#7B1FA2','#E65100','#fff'];
+
+// ── Admin Page ──
+const AdminPage = ({ onBack }) => {
+    const [stockData, setStockData] = useState(null);
+    const [logs, setLogs] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [resetConfirm, setResetConfirm] = useState(null);
+    const [previewShop, setPreviewShop] = useState(null);
+
+    useEffect(() => {
+        const unsub1 = dbOn('shopStock', (data) => { setStockData(data); setLoading(false); });
+        const unsub2 = dbOn('couponLogs', (data) => {
+            if (!data) { setLogs([]); return; }
+            const arr = Object.entries(data)
+                .map(([k,v]) => ({key:k,...v}))
+                .sort((a,b) => b.key - a.key)
+                .slice(0, 50);
+            setLogs(arr);
+        });
+        return () => { unsub1(); unsub2(); };
+    }, []);
+
+    const handleReset = async (shopId) => {
+        const shop = SHOPS.find(s => s.id === shopId);
+        await dbUpd(`shopStock/${shopId}`, {
+            remaining: shop.totalStock,
+            issued: 0,
+            codeIndex: shop.type === 'code' ? 0 : null,
+        });
+        setResetConfirm(null);
+    };
+
+    const handleToggleEnabled = async (shopId, currentEnabled) => {
+        await dbUpd(`shopStock/${shopId}`, {
+            enabled: currentEnabled === false ? true : false,
+        });
+    };
+
+    const formatDate = (iso) => {
+        try {
+            const d = new Date(iso);
+            return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()+543} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+        } catch { return iso; }
+    };
+
+    const totalIssued = stockData ? Object.values(stockData).reduce((s,v) => s+(v.issued||0), 0) : 0;
+    const totalRemaining = stockData ? Object.values(stockData).reduce((s,v) => s+(v.remaining||0), 0) : 0;
+
+    return (
+        <div className="min-h-full bg-slate-900 text-white">
+            {/* Header */}
+            <div className="bg-[#2D5A27] px-4 py-4 flex items-center gap-3 sticky top-0 z-10">
+                <button onClick={onBack} className="text-green-200 text-sm font-bold">← กลับ</button>
+                <div>
+                    <p className="font-black text-lg leading-none">Admin Dashboard</p>
+                    <p className="text-green-200 text-xs">Gracz Replace – สถิติคูปอง</p>
+                </div>
+            </div>
+
+            <div className="p-4 space-y-4 max-w-lg mx-auto">
+                {/* Summary Cards */}
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-slate-800 rounded-2xl p-4 text-center">
+                        <p className="text-3xl font-black text-yellow-400">{totalIssued.toLocaleString()}</p>
+                        <p className="text-xs text-slate-400 font-bold mt-1">คูปองที่ออกไปแล้ว</p>
+                    </div>
+                    <div className="bg-slate-800 rounded-2xl p-4 text-center">
+                        <p className="text-3xl font-black text-green-400">{totalRemaining.toLocaleString()}</p>
+                        <p className="text-xs text-slate-400 font-bold mt-1">คูปองคงเหลือรวม</p>
+                    </div>
+                </div>
+
+                {/* Shop Stock Table */}
+                <div className="bg-slate-800 rounded-2xl overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-700">
+                        <p className="font-black text-sm">📊 สต็อกคูปองแต่ละร้าน</p>
+                    </div>
+                    {loading ? (
+                        <p className="text-center text-slate-400 py-6 text-sm animate-pulse">กำลังโหลด...</p>
+                    ) : stockData ? (
+                        <div className="divide-y divide-slate-700">
+                            {SHOPS.map(shop => {
+                                const s = stockData[shop.id];
+                                if (!s) return null;
+                                const pct = Math.round((s.remaining / shop.totalStock) * 100);
+                                const barColor = pct > 50 ? '#4ade80' : pct > 20 ? '#fbbf24' : '#f87171';
+                                const isEnabled = s.enabled !== false;
+                                return (
+                                    <div key={shop.id} className={`px-4 py-3 transition-opacity ${!isEnabled ? 'opacity-50' : ''}`}>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-lg">{shop.emoji}</span>
+                                                <div>
+                                                    <p className="font-bold text-sm leading-none">{shop.name}</p>
+                                                    <p className="text-[10px] text-slate-400">{shop.discount}</p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="font-black text-sm">
+                                                    <span style={{color: barColor}}>{s.remaining.toLocaleString()}</span>
+                                                    <span className="text-slate-500">/{shop.totalStock.toLocaleString()}</span>
+                                                </p>
+                                                <p className="text-[10px] text-slate-400">ออกไป {(s.issued||0).toLocaleString()} ใบ</p>
+                                            </div>
+                                        </div>
+                                        {/* Progress bar */}
+                                        <div className="w-full bg-slate-700 rounded-full h-1.5 mb-2">
+                                            <div className="h-1.5 rounded-full transition-all" style={{width:`${pct}%`, background: barColor}}/>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-[10px] text-slate-500">
+                                                    {s.lastIssuedAt ? `ล่าสุด: ${formatDate(s.lastIssuedAt)}` : 'ยังไม่มีการออก'}
+                                                </p>
+                                                {!isEnabled && <span className="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-bold">ปิดการแจก</span>}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {resetConfirm === shop.id ? (
+                                                    <div className="flex gap-1">
+                                                        <button onClick={() => handleReset(shop.id)} className="text-[10px] bg-red-500 px-2 py-1 rounded-lg font-bold">ยืนยัน</button>
+                                                        <button onClick={() => setResetConfirm(null)} className="text-[10px] bg-slate-600 px-2 py-1 rounded-lg font-bold">ยกเลิก</button>
+                                                    </div>
+                                                ) : (
+                                                    <button onClick={() => setResetConfirm(shop.id)} className="text-[10px] text-slate-500 hover:text-red-400 font-bold transition-colors">รีเซ็ต</button>
+                                                )}
+                                                {/* Toggle Switch */}
+                                                <button onClick={() => handleToggleEnabled(shop.id, s.enabled)}
+                                                    className="relative w-10 h-5 rounded-full transition-colors flex-shrink-0"
+                                                    style={{background: isEnabled ? '#4ade80' : '#475569'}}>
+                                                    <span className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all"
+                                                        style={{left: isEnabled ? '22px' : '2px'}}/>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="p-4 text-center">
+                            <p className="text-slate-400 text-sm mb-3">ยังไม่มีข้อมูล</p>
+                            <button onClick={initShopStock} className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold">
+                                เริ่มต้นระบบ
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Recent Logs */}
+                <div className="bg-slate-800 rounded-2xl overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+                        <p className="font-black text-sm">🎫 ประวัติการออกคูปองล่าสุด</p>
+                        <p className="text-[10px] text-slate-400">{logs.length} รายการ</p>
+                    </div>
+                    {logs.length === 0 ? (
+                        <p className="text-center text-slate-500 py-6 text-sm">ยังไม่มีการออกคูปอง</p>
+                    ) : (
+                        <div className="divide-y divide-slate-700 max-h-72 overflow-y-auto">
+                            {logs.map((log, i) => {
+                                const shop = SHOPS.find(s => s.id === log.shopId);
+                                return (
+                                    <div key={log.key} className="px-4 py-2 flex items-center gap-3">
+                                        <span className="text-base">{shop?.emoji || '🎫'}</span>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-bold truncate">{log.shopName}</p>
+                                            {log.code && <p className="text-[10px] text-yellow-400 font-mono">{log.code}</p>}
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 text-right whitespace-nowrap">{formatDate(log.issuedAt)}</p>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {/* Coupon Preview */}
+                <div className="bg-slate-800 rounded-2xl overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-700">
+                        <p className="font-black text-sm">🎨 Preview คูปองแต่ละร้าน</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">กดเลือกร้านเพื่อดูหน้าตาคูปอง</p>
+                    </div>
+                    <div className="p-3 flex flex-wrap gap-2">
+                        {SHOPS.map(shop => (
+                            <button key={shop.id} onClick={() => setPreviewShop(previewShop?.id === shop.id ? null : shop)}
+                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-white text-xs font-bold transition-all active:scale-95"
+                                style={{background: previewShop?.id === shop.id ? shop.color : '#374151', border: `2px solid ${previewShop?.id === shop.id ? shop.color : 'transparent'}`}}>
+                                <span>{shop.emoji}</span> {shop.name}
+                            </button>
+                        ))}
+                    </div>
+
+                    {previewShop && (
+                        <div className="px-3 pb-4">
+                            <div className="rounded-2xl overflow-hidden border-2" style={{borderColor: previewShop.color}}>
+                                {/* Shop Header */}
+                                <div className="px-6 py-4 text-center" style={{background: previewShop.color}}>
+                                    <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest mb-2">Gracz Replace × {previewShop.name}</p>
+                                    <div className="w-full mx-auto mb-2 overflow-hidden" style={{margin:'0 -24px', width:'calc(100% + 48px)'}}>
+                                        {previewShop.logo ? (
+                                            <img src={previewShop.logo} alt={previewShop.name} className="w-full object-cover" style={{display:'block'}} />
+                                        ) : null}
+                                    </div>
+                                    <p className="text-white text-lg font-black mt-2">{previewShop.name}</p>
+                                    <p className="text-white/80 text-xs font-bold mt-0.5">{previewShop.discount}</p>
+                                </div>
+                                {/* Divider */}
+                                <div className="flex items-center px-4 py-1.5" style={{background: previewShop.bgColor}}>
+                                    <div className="flex-1 border-t-2 border-dashed border-slate-300"/>
+                                    <div className="mx-2 text-slate-400 text-xs">✂</div>
+                                    <div className="flex-1 border-t-2 border-dashed border-slate-300"/>
+                                </div>
+                                {/* Detail */}
+                                <div className="px-5 pb-4 text-center" style={{background: previewShop.bgColor}}>
+                                    <p className="text-slate-600 text-xs font-bold mb-2 leading-relaxed">{previewShop.desc}</p>
+                                    <div className="rounded-xl py-2 px-3 border-2 border-dashed text-center" style={{borderColor: previewShop.color, background:'white'}}>
+                                        {previewShop.type === 'qr' ? (
+                                            <>
+                                                <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">แสกน QR Code เพื่อรับส่วนลด</p>
+                                                <img src={previewShop.qrCode} alt="QR" className="w-32 h-32 mx-auto object-contain"/>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <p className="text-[9px] text-slate-400 font-bold uppercase mb-0.5">
+                                                    {previewShop.type === 'code' ? 'โค้ดส่วนลด' : 'ประเภทส่วนลด'}
+                                                </p>
+                                                <p className="text-lg font-black tracking-widest" style={{color: previewShop.color}}>
+                                                    {previewShop.type === 'code' ? previewShop.codes[0] : previewShop.discount}
+                                                </p>
+                                            </>
+                                        )}
+                                    </div>
+                                    {(previewShop.id !== 'shopee' && previewShop.id !== 'lazada') && (
+                                        <div className="bg-yellow-400 rounded-xl px-3 py-2 mt-2 text-center">
+                                            <p className="text-[#1a3a14] text-[10px] font-black leading-relaxed">
+                                                {previewShop.id === 'sukthukkham'
+                                                    ? '📸 แคปหน้าจอแล้วแสดงที่หน้าร้านหรือผ่านทางไลน์ Id Line@sooktookkum'
+                                                    : '📸 แคปหน้าจอส่งไลน์มาที่ @gracz เพื่อรับของรางวัลเลย!'
+                                                }
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <p className="text-center text-slate-600 text-[10px] pb-4">Gracz Replace Admin v1.0</p>
+            </div>
+        </div>
+    );
+};
+
+// ── Treasure Box (New) ──
+const TreasureBox = ({ winner, onClose }) => {
+    const [phase, setPhase] = useState('bounce'); // bounce → shaking → opening → loading → coupon | empty
+    const [couponData, setCouponData] = useState(null);
+    const [confetti, setConfetti] = useState([]);
+    const [copyDone, setCopyDone] = useState(false);
+    const [error, setError] = useState(null);
+
+    const handleBoxClick = async () => {
+        if (phase !== 'bounce') return;
+        setPhase('shaking');
+
+        setTimeout(async () => {
+            setPhase('opening');
+
+            // สร้าง confetti
+            setConfetti(Array.from({length:20},(_,i)=>({
+                id:i, left:`${Math.random()*90+5}%`,
+                color: confettiColors[i % confettiColors.length],
+                delay:`${Math.random()*0.5}s`,
+                dur:`${0.8+Math.random()*0.8}s`,
+                size:`${8+Math.random()*10}px`,
+            })));
+
+            setTimeout(async () => {
+                setPhase('loading');
+                try {
+                    await initShopStock(); // ensure stock exists
+                    const result = await claimCoupon();
+                    if (!result) {
+                        setPhase('empty');
+                    } else {
+                        setCouponData(result);
+                        setPhase('coupon');
+                    }
+                } catch(e) {
+                    setError('เกิดข้อผิดพลาด กรุณาลองใหม่');
+                    setPhase('bounce');
+                }
+            }, 400);
+        }, 500);
+    };
+
+    const shareText = `🎮 มาเล่นเกม Gracz Replace กันเถอะ!\nเล่นสนุก ลุ้นของรางวัลสุดพิเศษกันได้เลย 🎁\nคลิกเล่นได้เลย: ${window.location.href}`;
+    const shareLine = () => window.open(`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent(shareText)}`,'_blank');
+    const shareFB   = () => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}&quote=${encodeURIComponent(shareText)}`,'_blank');
+    const copyCode  = () => {
+        const text = couponData?.couponCode
+            ? `โค้ดส่วนลด ${couponData.shop.name}: ${couponData.couponCode}`
+            : `คูปองส่วนลด ${couponData?.shop?.discount} จาก ${couponData?.shop?.name}`;
+        navigator.clipboard.writeText(text).then(()=>{ setCopyDone(true); setTimeout(()=>setCopyDone(false),2000); });
+    };
+
+    const shop = couponData?.shop;
+    const code = couponData?.couponCode;
+
+    return (
+        <div className="fixed inset-0 flex flex-col items-center justify-center z-50 p-5 overflow-y-auto"
+            style={{background:'linear-gradient(135deg,#1a3a14 0%,#2D5A27 100%)'}}>
+
+            {/* Confetti */}
+            {confetti.map(c=>(
+                <div key={c.id} className="fixed pointer-events-none rounded-sm" style={{
+                    left:c.left, top:'-10px', width:c.size, height:c.size,
+                    background:c.color, animationName:'confettiFall',
+                    animationDuration:c.dur, animationDelay:c.delay,
+                    animationFillMode:'forwards', animationTimingFunction:'linear'
+                }}/>
+            ))}
+
+            {/* Winner name */}
+            <div className="text-center mb-5">
+                <p className="text-yellow-300 text-xs font-black tracking-widest uppercase mb-1">🏆 ผู้ชนะ</p>
+                <p className="text-white text-3xl font-black shimmer-text">{winner}</p>
+            </div>
+
+            {/* Box phases */}
+            {(phase === 'bounce' || phase === 'shaking' || phase === 'opening') && (
+                <div className="flex flex-col items-center">
+                    <div onClick={handleBoxClick} className={`cursor-pointer select-none ${phase==='bounce'?'box-bounce':''} ${phase==='shaking'?'box-shake':''}`}>
+                        <div className="text-center" style={{fontSize:'100px',lineHeight:1,filter:'drop-shadow(0 8px 24px rgba(251,191,36,0.7))'}}>
+                            {phase==='opening'?'📦':'🎁'}
+                        </div>
+                    </div>
+                    <p className="text-yellow-200 font-bold mt-4 text-sm animate-pulse">
+                        {phase==='bounce' ? '🎁 แตะกล่องเพื่อรับรางวัล!' : phase==='shaking' ? 'กำลังเปิด...' : '✨'}
+                    </p>
+                    {error && <p className="text-red-300 text-xs mt-2">{error}</p>}
+                </div>
+            )}
+
+            {phase === 'loading' && (
+                <div className="flex flex-col items-center gap-4">
+                    <div className="text-6xl animate-pulse">🎫</div>
+                    <p className="text-yellow-200 font-bold text-sm animate-pulse">กำลังจับสลากคูปอง...</p>
+                </div>
+            )}
+
+            {/* Coupon Card */}
+            {phase === 'coupon' && shop && (
+                <div className="coupon-slide w-full max-w-xs">
+                    <p className="text-yellow-300 text-center text-xs font-black uppercase tracking-widest mb-3">🎊 คูปองของคุณ</p>
+
+                    <div className="coupon-glow rounded-3xl overflow-hidden" style={{background: shop.bgColor}}>
+                        {/* Shop Header */}
+                        <div className="px-6 py-5 text-center" style={{background: shop.color}}>
+                            <p className="text-white/70 text-xs font-bold uppercase tracking-widest mb-2">Gracz Replace × {shop.name}</p>
+                            <div className="w-full mx-auto mb-2 overflow-hidden" style={{margin:'0 -24px', width:'calc(100% + 48px)'}}>
+                                {shop.logo ? (
+                                    <img
+                                        src={shop.logo}
+                                        alt={shop.name}
+                                        className="w-full object-cover"
+                                        style={{display:'block'}}
+                                        onError={e => { e.target.style.display='none'; e.target.parentNode.querySelector('.logo-fallback').style.display='flex'; }}
+                                    />
+                                ) : null}
+                                <span className="logo-fallback text-6xl w-full bg-white flex items-center justify-center py-6" style={{display: shop.logo ? 'none' : 'flex'}}>{shop.emoji}</span>
+                            </div>
+                            <p className="text-white text-xl font-black">{shop.name}</p>
+                            <p className="text-white/80 text-sm font-bold mt-0.5">{shop.discount}</p>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="flex items-center px-4 py-2" style={{background: shop.bgColor}}>
+                            <div className="flex-1 border-t-2 border-dashed border-slate-300"/>
+                            <div className="mx-2 text-slate-400 text-xs">✂</div>
+                            <div className="flex-1 border-t-2 border-dashed border-slate-300"/>
+                        </div>
+
+                        {/* Coupon detail */}
+                        <div className="px-6 pb-5 text-center" style={{background: shop.bgColor}}>
+                            <p className="text-slate-600 text-sm font-bold mb-3 leading-relaxed">{shop.desc}</p>
+
+                            {shop.type === 'qr' ? (
+                                <div className="rounded-xl py-3 px-4 mb-2 border-2 border-dashed text-center" style={{borderColor: shop.color, background:'white'}}>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">แสกน QR Code เพื่อรับส่วนลด</p>
+                                    <img src={shop.qrCode} alt="QR Code" className="w-40 h-40 mx-auto object-contain" />
+                                    <p className="text-[10px] text-slate-400 mt-2">แสดงหน้าจอนี้เพื่อรับส่วนลด</p>
+                                </div>
+                            ) : code ? (
+                                <div className="rounded-xl py-3 px-4 mb-2 border-2 border-dashed" style={{borderColor: shop.color, background:'white'}}>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">โค้ดส่วนลด</p>
+                                    <p className="text-2xl font-black tracking-widest" style={{color: shop.color}}>{code}</p>
+                                </div>
+                            ) : (
+                                <div className="rounded-xl py-3 px-4 mb-2 border-2 border-dashed" style={{borderColor: shop.color, background:'white'}}>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">ประเภทส่วนลด</p>
+                                    <p className="text-xl font-black" style={{color: shop.color}}>{shop.discount}</p>
+                                    <p className="text-[10px] text-slate-400 mt-1">แคปหน้าจอเพื่อรับสิทธิ์</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="mt-4 space-y-2">
+                        {(shop.id !== 'shopee' && shop.id !== 'lazada') && (
+                            <div className="bg-yellow-400 rounded-2xl px-4 py-3 text-center">
+                                <p className="text-[#1a3a14] text-xs font-black leading-relaxed">
+                                    {shop.id === 'sukthukkham'
+                                        ? <>📸 แคปหน้าจอแล้วแสดงที่หน้าร้านหรือผ่านทางไลน์ Id <span className="underline">Line@sooktookkum</span></>
+                                        : <>📸 แคปหน้าจอส่งไลน์มาที่ <span className="underline">@gracz</span> เพื่อรับของรางวัลเลย!</>
+                                    }
+                                </p>
+                            </div>
+                        )}
+                        {code && (
+                            <button onClick={copyCode}
+                                className="w-full py-3 rounded-xl font-black text-white text-sm flex items-center justify-center gap-2 transition-all"
+                                style={{background: copyDone ? '#666' : shop.color}}>
+                                {copyDone ? '✅ คัดลอกแล้ว!' : '📋 คัดลอกโค้ด'}
+                            </button>
+                        )}
+                        <p className="text-yellow-200 text-center text-xs font-bold uppercase tracking-widest">ชวนเพื่อนมาเล่น</p>
+                        <div className="flex gap-2">
+                            <button onClick={shareLine} className="flex-1 py-3 rounded-xl font-black text-white text-sm flex items-center justify-center gap-1.5" style={{background:'#06C755'}}>
+                                <span>💬</span> LINE
+                            </button>
+                            <button onClick={shareFB} className="flex-1 py-3 rounded-xl font-black text-white text-sm flex items-center justify-center gap-1.5" style={{background:'#1877F2'}}>
+                                <span>📘</span> Facebook
+                            </button>
+                        </div>
+                        <button onClick={onClose} className="w-full py-3 rounded-xl font-black text-[#2D5A27] bg-white text-sm">
+                            กลับหน้าหลัก
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Empty — coupon หมดทุกร้าน */}
+            {phase === 'empty' && (
+                <div className="w-full max-w-xs text-center coupon-slide">
+                    <div className="text-6xl mb-4">😔</div>
+                    <div className="bg-white/10 rounded-3xl p-6 mb-4">
+                        <p className="text-white text-lg font-black mb-2">คูปองหมดแล้วในขณะนี้</p>
+                        <p className="text-green-200 text-sm font-bold leading-relaxed">
+                            ขออภัยครับ คูปองจากร้านค้าพาร์ทเนอร์หมดแล้วทุกร้าน
+                        </p>
+                    </div>
+                    <div className="bg-[#06C755] rounded-2xl px-5 py-4 text-center mb-4">
+                        <p className="text-white text-sm font-black mb-1">ติดต่อรับสิทธิ์ได้ที่</p>
+                        <p className="text-white text-2xl font-black">Line@ @gracz</p>
+                        <p className="text-green-100 text-xs mt-1">ทีมงานจะดูแลคุณโดยตรงครับ 💚</p>
+                    </div>
+                    <button onClick={onClose} className="w-full py-3 rounded-xl font-black text-[#2D5A27] bg-white text-sm">
+                        กลับหน้าหลัก
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const playerTokens = [
+    { name: 'ทีมเขียว',  color: 'bg-[#2D5A27]', hex: '#2D5A27' },
+    { name: 'ทีมฟ้า',    color: 'bg-[#0288D1]', hex: '#0288D1' },
+    { name: 'ทีมเหลือง', color: 'bg-[#FBC02D]', hex: '#FBC02D' },
+    { name: 'ทีมแดง',    color: 'bg-[#D32F2F]', hex: '#D32F2F' },
+    { name: 'ทีมม่วง',   color: 'bg-[#7B1FA2]', hex: '#7B1FA2' },
+    { name: 'ทีมส้ม',    color: 'bg-[#E65100]', hex: '#E65100' },
+];
+
+const Icon = ({ name, size = 24, className = "" }) => {
+    const icons = {
+        leaf:   <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.5 21 2c-2.5 4-3 5.5-4.1 11.2A7 7 0 0 1 11 20z" />,
+        trophy: <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6 M18 9h1.5a2.5 2.5 0 0 0 0-5H18 M4 22h16 M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22 M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22 M18 2H6v7a6 6 0 0 0 12 0V2z" />,
+        copy:   <path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2M8 4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2M8 4h8" />,
+        wifi:   <React.Fragment><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></React.Fragment>,
+        chart:  <React.Fragment><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></React.Fragment>,
+    };
+    return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+            {icons[name] || null}
+        </svg>
+    );
+};
+
+const Dice3D = ({ value, rolling }) => {
+    const getRotation = (v) => {
+        const map = { 1:"rotateX(0deg) rotateY(0deg)", 2:"rotateX(0deg) rotateY(-90deg)", 3:"rotateX(-90deg) rotateY(0deg)", 4:"rotateX(90deg) rotateY(0deg)", 5:"rotateX(0deg) rotateY(90deg)", 6:"rotateX(180deg) rotateY(0deg)" };
+        return map[v] || map[1];
+    };
+    return (
+        <div className="scene">
+            <div className={`dice ${rolling ? 'rolling' : ''}`} style={{ transform: rolling ? '' : getRotation(value) }}>
+                <div className="dice-face face-1"><div className="dot red col-start-2 row-start-2"></div></div>
+                <div className="dice-face face-2"><div className="dot col-start-1 row-start-1"></div><div className="dot col-start-3 row-start-3"></div></div>
+                <div className="dice-face face-3"><div className="dot col-start-1 row-start-1"></div><div className="dot col-start-2 row-start-2"></div><div className="dot col-start-3 row-start-3"></div></div>
+                <div className="dice-face face-4"><div className="dot col-start-1 row-start-1"></div><div className="dot col-start-3 row-start-1"></div><div className="dot col-start-1 row-start-3"></div><div className="dot col-start-3 row-start-3"></div></div>
+                <div className="dice-face face-5"><div className="dot col-start-1 row-start-1"></div><div className="dot col-start-3 row-start-1"></div><div className="dot col-start-2 row-start-2"></div><div className="dot col-start-1 row-start-3"></div><div className="dot col-start-3 row-start-3"></div></div>
+                <div className="dice-face face-6"><div className="dot col-start-1 row-start-1"></div><div className="dot col-start-3 row-start-1"></div><div className="dot col-start-1 row-start-2"></div><div className="dot col-start-3 row-start-2"></div><div className="dot col-start-1 row-start-3"></div><div className="dot col-start-3 row-start-3"></div></div>
+            </div>
+        </div>
+    );
+};
+
+const TileZoomModal = ({ tile, player, coord, tileIdx, onDone }) => {
+    const [animClass, setAnimClass] = useState('tile-zoom-enter');
+    useEffect(() => {
+        const t1 = setTimeout(() => setAnimClass('tile-zoom-exit'), 2700);
+        const t2 = setTimeout(() => onDone(), 3000);
+        return () => { clearTimeout(t1); clearTimeout(t2); };
+    }, []);
+    const isFinish = tileIdx === boardTiles.length - 1;
+    const imgSrc = tileImages[tileIdx] || tileImages[0];
+    const sparklePositions = [
+        { top:'-22px', left:'50%', transform:'translateX(-50%)' },
+        { top:'50%', right:'-22px', transform:'translateY(-50%)' },
+        { bottom:'-22px', left:'50%', transform:'translateX(-50%)' },
+        { top:'50%', left:'-22px', transform:'translateY(-50%)' },
+        { top:'-16px', left:'-16px' }, { top:'-16px', right:'-16px' },
+        { bottom:'-16px', left:'-16px' }, { bottom:'-16px', right:'-16px' },
+    ];
+    return (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-6">
+            <div className={`w-full max-w-xs ${animClass}`}>
+                <div className="bg-[#2D5A27] text-white text-center py-2 px-4 rounded-t-2xl">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-green-200">{player.name} เหยียบช่อง</p>
+                    <p className="text-lg font-black">{tile.name}</p>
+                </div>
+                <div className={`relative w-full border-x-4 border-[#2D5A27] ${isFinish ? 'finish-glow' : ''}`} style={{ aspectRatio: '1/1', overflow: 'visible' }}>
+                    {isFinish && sparklePositions.map((style, i) => (
+                        <span key={i} className="sparkle-star" style={{ ...style, animationDelay:`${i*0.22}s` }}>✨</span>
+                    ))}
+                    <img src={imgSrc} alt={tile.name} className="w-full h-full object-contain bg-white" style={{ display:'block' }} />
+                </div>
+                <div className="bg-white text-center px-4 py-3 rounded-b-2xl border-x-4 border-b-4 border-[#2D5A27]">
+                    <p className="text-sm font-bold text-slate-600 leading-snug">{tile.desc}</p>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ── Main App ──
+const App = () => {
+    const [screen, setScreen] = useState('lobby');
+    const [roomCode, setRoomCode] = useState('');
+    const [joinInput, setJoinInput] = useState('');
+    const [myIdx, setMyIdx] = useState(0);
+    const [gameState, setGameState] = useState(null);
+    const [isRolling, setIsRolling] = useState(false);
+    const [lastRoll, setLastRoll] = useState(1);
+    const [showTileZoom, setShowTileZoom] = useState(null);
+    const [showEffectModal, setShowEffectModal] = useState(null);
+    const [showInviteModal, setShowInviteModal] = useState(null);
+    const [copied, setCopied] = useState(false);
+    const [playerCount, setPlayerCount] = useState(2);
+    const [fbReady, setFbReady] = useState(!!window._firebaseReady);
+    const [isOffline, setIsOffline] = useState(false);
+    const [showAdmin, setShowAdmin] = useState(false);
+    const unsubRef = useRef(null);
+    const offlineStateRef = useRef(null);
+
+    // Check for admin mode via URL
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('admin') === 'true') setShowAdmin(true);
+    }, []);
+
+    const startOfflineGame = () => {
+        const players = Array.from({ length: playerCount }, (_, i) => ({
+            id: i, name: playerTokens[i].name, pos: 0, skipTurns: 0, color: playerTokens[i].color, hex: playerTokens[i].hex
+        }));
+        const initState = {
+            screen: 'game', players,
+            currentPlayerIdx: 0, lastRoll: 1,
+            logs: ["ยินดีต้อนรับสู่ Gracz! (Offline)"],
+            winner: null, playerCount,
+        };
+        offlineStateRef.current = initState;
+        setIsOffline(true);
+        setMyIdx(0);
+        setGameState(initState);
+        setScreen('game');
+    };
+
+    useEffect(() => { waitForFirebase(() => setFbReady(true)); }, []);
+
+    useEffect(() => {
+        if (!roomCode || !fbReady) return;
+        if (unsubRef.current) unsubRef.current();
+        unsubRef.current = dbOn(`rooms/${roomCode}`, (data) => {
+            if (!data) return;
+            setGameState(data);
+            if (data.screen === 'game' && screen !== 'game') setScreen('game');
+        });
+        return () => { if (unsubRef.current) unsubRef.current(); };
+    }, [roomCode, fbReady]);
+
+    const createRoom = async () => {
+        if (!fbReady) return;
+        const code = randomCode();
+        const players = Array.from({ length: playerCount }, (_, i) => ({
+            id: i, name: playerTokens[i].name, pos: 0, skipTurns: 0, color: playerTokens[i].color, hex: playerTokens[i].hex
+        }));
+        await dbSet(`rooms/${code}`, {
+            screen: 'waiting', players,
+            currentPlayerIdx: 0, lastRoll: 1,
+            logs: ["ยินดีต้อนรับสู่ Gracz!"],
+            winner: null, playerCount,
+        });
+        setRoomCode(code);
+        setMyIdx(0);
+        setScreen('waiting');
+    };
+
+    const joinRoom = async () => {
+        if (!fbReady || !joinInput) return;
+        const code = joinInput.toUpperCase();
+        const data = await dbGet(`rooms/${code}`);
+        if (!data) { alert('ไม่พบห้องนี้ครับ'); return; }
+        const joined = data.joinedCount || 1;
+        if (joined >= data.playerCount) { alert('ห้องเต็มแล้วครับ'); return; }
+        await dbUpd(`rooms/${code}`, { joinedCount: joined + 1 });
+        setRoomCode(code);
+        setMyIdx(joined);
+        setScreen(data.screen === 'game' ? 'game' : 'waiting');
+    };
+
+    const startGame = async () => {
+        await dbUpd(`rooms/${roomCode}`, { screen: 'game', joinedCount: gameState?.playerCount || playerCount });
+    };
+
+    const copyCode = () => {
+        navigator.clipboard.writeText(roomCode).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+    };
+
+    const gs = gameState;
+    const isMyTurn = gs && (isOffline ? true : gs.currentPlayerIdx === myIdx);
+
+    const pushUpdate = (patch) => {
+        if (isOffline) {
+            const merged = { ...offlineStateRef.current, ...patch };
+            offlineStateRef.current = merged;
+            setGameState({ ...merged });
+            return Promise.resolve();
+        }
+        return dbUpd(`rooms/${roomCode}`, patch);
+    };
+
+    const handleMove = (playerIdx, steps, isEffect = false, currentPlayers = null) => {
+        const basePlayers = currentPlayers || gs.players;
+        const newPlayers = basePlayers.map((p, i) => {
+            if (i !== playerIdx) return p;
+            let newPos = p.pos + steps;
+            if (newPos >= boardTiles.length - 1) newPos = boardTiles.length - 1;
+            if (newPos < 0) newPos = 0;
+            return { ...p, pos: newPos };
+        });
+        pushUpdate({ players: newPlayers }).then(() => {
+            if (!isEffect) {
+                setTimeout(() => {
+                    const pos = newPlayers[playerIdx].pos;
+                    setShowTileZoom({
+                        tile: boardTiles[pos], player: newPlayers[playerIdx],
+                        coord: tileCoords[pos], tileIdx: pos,
+                        onDone: () => { setShowTileZoom(null); checkTileEffect(playerIdx, newPlayers); }
+                    });
+                }, 1300);
+            } else {
+                setTimeout(() => {
+                    const pos = newPlayers[playerIdx].pos;
+                    setShowTileZoom({
+                        tile: boardTiles[pos], player: newPlayers[playerIdx],
+                        coord: tileCoords[pos], tileIdx: pos,
+                        onDone: () => { setShowTileZoom(null); moveToNextPlayer(newPlayers); }
+                    });
+                }, 400);
+            }
+        });
+    };
+
+    const checkTileEffect = (playerIdx, players) => {
+        const pList = players || gs.players;
+        const pos = pList[playerIdx].pos;
+        const tile = boardTiles[pos];
+
+        if (pos === boardTiles.length - 1) {
+            pushUpdate({ winner: pList[playerIdx].name });
+            return;
+        }
+
+        if (tile.effect) {
+            if (tile.effect.invite) {
+                const selfMoved = pList.map((p, i) => {
+                    if (i !== playerIdx) return p;
+                    return { ...p, pos: Math.min(p.pos + 1, boardTiles.length - 1) };
+                });
+                pushUpdate({ players: selfMoved }).then(() => {
+                    setShowInviteModal({
+                        playerIdx, players: selfMoved,
+                        onSelect: (friendIdx) => {
+                            setShowInviteModal(null);
+                            const friendMoved = selfMoved.map((p, i) => {
+                                if (i !== friendIdx) return p;
+                                return { ...p, pos: Math.min(p.pos + 1, boardTiles.length - 1) };
+                            });
+                            pushUpdate({ players: friendMoved }).then(() => { moveToNextPlayer(friendMoved); });
+                        }
+                    });
+                });
+            } else if (tile.effect.move) {
+                setShowEffectModal({
+                    player: pList[playerIdx], tile,
+                    onClose: () => { setShowEffectModal(null); handleMove(playerIdx, tile.effect.move, true, pList); }
+                });
+            } else if (tile.effect.skip) {
+                setShowEffectModal({
+                    player: pList[playerIdx], tile,
+                    onClose: () => {
+                        setShowEffectModal(null);
+                        const np = pList.map((p, i) => i === playerIdx ? { ...p, skipTurns: tile.effect.skip } : p);
+                        pushUpdate({ players: np });
+                        moveToNextPlayer(np);
+                    }
+                });
+            } else {
+                moveToNextPlayer(pList);
+            }
+        } else {
+            moveToNextPlayer(pList);
+        }
+    };
+
+    const moveToNextPlayer = (players) => {
+        const pList = players || gs.players;
+        let next = (gs.currentPlayerIdx + 1) % pList.length;
+        let newPlayers = [...pList];
+        let newLogs = [...(gs.logs || [])];
+        if (newPlayers[next].skipTurns > 0) {
+            newLogs = [`${newPlayers[next].name} พักตา`, ...newLogs].slice(0, 5);
+            newPlayers[next] = { ...newPlayers[next], skipTurns: newPlayers[next].skipTurns - 1 };
+            next = (next + 1) % pList.length;
+        }
+        pushUpdate({ currentPlayerIdx: next, players: newPlayers, logs: newLogs });
+    };
+
+    const rollDice = () => {
+        if (!isMyTurn || isRolling || showEffectModal || showTileZoom || showInviteModal || gs?.winner) return;
+        const activeIdx = isOffline ? gs.currentPlayerIdx : myIdx;
+        setIsRolling(true);
+        const dice = Math.floor(Math.random() * 6) + 1;
+        setTimeout(() => {
+            setLastRoll(dice);
+            setIsRolling(false);
+            const newLogs = [`${gs.players[activeIdx].name} ทอยได้ ${dice}`, ...(gs.logs || [])].slice(0, 5);
+            pushUpdate({ lastRoll: dice, logs: newLogs });
+            handleMove(activeIdx, dice);
+        }, 1000);
+    };
+
+    // Admin page
+    if (showAdmin) return <AdminPage onBack={() => setShowAdmin(false)} />;
+
+    if (!fbReady) return (
+        <div className="min-h-full flex items-center justify-center bg-[#f0f4f0]">
+            <p className="text-[#2D5A27] font-black animate-pulse">กำลังเชื่อมต่อ Firebase...</p>
+        </div>
+    );
+
+    // LOBBY
+    if (screen === 'lobby') return (
+        <div className="min-h-full flex items-center justify-center p-6" style={{ background: '#2D5A27' }}>
+            <div className="bg-white rounded-[2.5rem] shadow-xl w-full max-w-sm text-center overflow-hidden">
+                <img
+                    src="https://drive.google.com/thumbnail?id=1PZ6akJuBT0L75oV5CNyxz7nSDRIq8Idt&sz=w800"
+                    alt="Gracz Replace Logo" className="w-full" style={{ display: 'block' }}
+                />
+                <div className="p-8 pt-6">
+                    <div className="bg-slate-50 p-5 rounded-2xl mb-4">
+                        <p className="text-xs font-bold text-slate-400 mb-3 uppercase">สร้างห้องใหม่</p>
+                        <div className="flex justify-center gap-2 mb-3 flex-wrap">
+                            {[2,3,4,5,6].map(n => (
+                                <button key={n} onClick={() => setPlayerCount(n)}
+                                    className={`w-11 h-11 rounded-xl font-bold text-sm transition-all ${playerCount===n?'bg-[#2D5A27] text-white':'bg-white text-slate-400 border'}`}>
+                                    {n}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="flex justify-center gap-1.5 mb-3">
+                            {Array.from({ length: playerCount }, (_, i) => (
+                                <div key={i} className="flex flex-col items-center gap-1">
+                                    <div className="w-5 h-5 rounded-full border-2 border-white shadow" style={{ background: playerTokens[i].hex }} />
+                                    <span className="text-[8px] text-slate-400 font-bold">{playerTokens[i].name.replace('ทีม','')}</span>
+                                </div>
+                            ))}
+                        </div>
+                        <button onClick={createRoom} className="w-full bg-[#2D5A27] text-white py-3 rounded-xl font-black text-base shadow">
+                            สร้างห้อง ({playerCount} คน)
+                        </button>
+                        <button onClick={startOfflineGame} className="w-full mt-2 bg-amber-500 text-white py-3 rounded-xl font-black text-base shadow flex items-center justify-center gap-2">
+                            <span>📵</span> เล่น Offline ({playerCount} คน)
+                        </button>
+                    </div>
+                    <div className="bg-slate-50 p-5 rounded-2xl mb-4">
+                        <p className="text-xs font-bold text-slate-400 mb-3 uppercase">เข้าร่วมห้อง</p>
+                        <input
+                            value={joinInput} onChange={e => setJoinInput(e.target.value.toUpperCase())}
+                            placeholder="กรอก Room Code"
+                            className="w-full border-2 border-slate-200 rounded-xl px-4 py-2 text-center font-black text-lg tracking-widest mb-3 focus:outline-none focus:border-[#2D5A27]"
+                            maxLength={5}
+                        />
+                        <button onClick={joinRoom} disabled={!joinInput} className="w-full bg-[#0288D1] text-white py-3 rounded-xl font-black text-base shadow disabled:opacity-40">
+                            เข้าห้อง
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    );
+
+    // WAITING ROOM
+    if (screen === 'waiting') return (
+        <div className="min-h-full flex items-center justify-center p-6 bg-[#f0f4f0]">
+            <div className="bg-white p-8 rounded-[2.5rem] shadow-xl w-full max-w-sm text-center">
+                <Icon name="wifi" size={48} className="text-[#2D5A27] mx-auto mb-4" />
+                <h2 className="text-2xl font-black text-[#2D5A27] mb-2">รอผู้เล่น...</h2>
+                <p className="text-slate-400 text-sm mb-6">แชร์ Room Code ให้เพื่อนครับ</p>
+                <div className="bg-[#2D5A27] rounded-2xl p-4 mb-6">
+                    <p className="text-green-300 text-xs font-bold mb-1">ROOM CODE</p>
+                    <p className="text-white text-4xl font-black tracking-[0.3em]">{roomCode}</p>
+                    <button onClick={copyCode} className="mt-2 flex items-center gap-1 mx-auto text-green-300 text-xs font-bold">
+                        <Icon name="copy" size={12} /> {copied ? 'คัดลอกแล้ว!' : 'คัดลอก'}
+                    </button>
+                </div>
+                <div className="space-y-2 mb-6">
+                    {Array.from({ length: gs?.playerCount || playerCount }, (_, i) => (
+                        <div key={i} className="flex items-center gap-3 px-4 py-2 rounded-xl bg-slate-50">
+                            <div className="w-3 h-3 rounded-full" style={{ background: playerTokens[i].hex }} />
+                            <span className="text-sm font-bold text-slate-600">{playerTokens[i].name}</span>
+                            <span className="ml-auto text-xs text-slate-400">
+                                {i === 0 ? '👑 Host' : i < (gs?.joinedCount || 1) ? '✅ เข้าร่วมแล้ว' : '⏳ รออยู่...'}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+                {myIdx === 0 ? (
+                    <button onClick={startGame}
+                        disabled={(gs?.joinedCount || 1) < (gs?.playerCount || playerCount)}
+                        className="w-full bg-[#2D5A27] text-white py-4 rounded-2xl font-black text-lg shadow disabled:opacity-40">
+                        {(gs?.joinedCount || 1) < (gs?.playerCount || playerCount) ? 'รอผู้เล่นเข้าร่วม...' : 'เริ่มเกม!'}
+                    </button>
+                ) : (
+                    <p className="text-slate-400 font-bold animate-pulse">รอ Host เริ่มเกม...</p>
+                )}
+            </div>
+        </div>
+    );
+
+    // GAME OVER
+    const onBackToLobby = () => { setScreen('lobby'); setRoomCode(''); setGameState(null); setIsOffline(false); offlineStateRef.current = null; };
+
+    if (gs?.winner) {
+        const iAmWinner = isOffline ? true : gs.players?.[myIdx]?.name === gs.winner;
+
+        if (iAmWinner) return <TreasureBox winner={gs.winner} onClose={onBackToLobby} />;
+
+        // หน้าแพ้
+        const loserShareText = `🎮 มาเล่นเกม Gracz Replace กันเถอะ!\nเล่นสนุก ลุ้นของรางวัลสุดพิเศษกันได้เลย 🎁\nคลิกเล่นได้เลย: ${window.location.href}`;
+        return (
+            <div className="fixed inset-0 flex flex-col items-center justify-center z-50 p-6 overflow-y-auto"
+                style={{background:'linear-gradient(135deg,#1a3a14 0%,#2D5A27 100%)'}}>
+                <div className="text-center w-full max-w-xs mx-auto">
+                    <p className="text-6xl mb-3">😢</p>
+                    <p className="text-yellow-300 text-sm font-bold tracking-widest uppercase mb-1">ผู้ชนะคือ</p>
+                    <p className="text-white text-2xl font-black mb-4">🏆 {gs.winner}</p>
+                    <div className="bg-white/10 rounded-3xl p-5 mb-5">
+                        <p className="text-white text-base font-black leading-relaxed mb-1">เสียใจด้วยนะ 😔</p>
+                        <p className="text-green-200 text-sm font-bold leading-relaxed">คุณฝีมือยังไม่ถึงในครั้งนี้...</p>
+                    </div>
+                    <div className="bg-yellow-400 rounded-2xl px-4 py-3 text-center mb-4">
+                        <p className="text-[#1a3a14] text-xs font-black leading-relaxed">🎮 ชวนเพื่อนมาเล่นด้วยกัน รับของรางวัลสุดพิเศษ!</p>
+                    </div>
+                    <div className="flex gap-2 mb-3">
+                        <button onClick={() => window.open(`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent(loserShareText)}`,'_blank')}
+                            className="flex-1 py-3 rounded-xl font-black text-white text-sm flex items-center justify-center gap-1.5" style={{background:'#06C755'}}>
+                            <span>💬</span> LINE
+                        </button>
+                        <button onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}&quote=${encodeURIComponent(loserShareText)}`,'_blank')}
+                            className="flex-1 py-3 rounded-xl font-black text-white text-sm flex items-center justify-center gap-1.5" style={{background:'#1877F2'}}>
+                            <span>📘</span> Facebook
+                        </button>
+                    </div>
+                    <button onClick={onBackToLobby} className="w-full py-4 rounded-2xl font-black text-[#2D5A27] bg-white text-lg shadow-xl">
+                        กลับหน้าหลัก
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    // GAME
+    if (screen === 'game' && gs) {
+        const players = gs.players || [];
+        const currentPlayerIdx = gs.currentPlayerIdx || 0;
+        const diceVal = gs.lastRoll || 1;
+        const logs = gs.logs || [];
+        const currentPlayer = players[currentPlayerIdx] || {};
+
+        return (
+            <div className="min-h-full flex flex-col bg-[#f0f4f0]">
+                <div className="flex justify-center gap-2 p-3 bg-white/80 sticky top-0 z-30 overflow-x-auto whitespace-nowrap border-b">
+                    {players.map((p, i) => (
+                        <div key={i} className={`flex items-center gap-2 px-3 py-1.5 rounded-full border-2 transition-all ${currentPlayerIdx===i?'border-[#2D5A27] bg-green-50 scale-105':'border-transparent opacity-50'}`}>
+                            <div className="w-3 h-3 rounded-full" style={{ background: p.hex }} />
+                            <span className="text-xs font-bold text-[#2D5A27]">{p.name}</span>
+                            {i === myIdx && <span className="text-[9px] text-green-500 font-black">(ฉัน)</span>}
+                        </div>
+                    ))}
+                </div>
+
+                <div className="relative w-full aspect-[4/3] bg-white p-1">
+                    <img src={boardImage} alt="Board" className="w-full h-full object-contain" />
+                    <div className="absolute inset-0">
+                        {players.map((p, i) => {
+                            const coords = tileCoords[p.pos] || { x: 0, y: 0 };
+                            const offsets = [{x:-1.5,y:-1.5},{x:1.5,y:-1.5},{x:-1.5,y:1.5},{x:1.5,y:1.5},{x:0,y:-3},{x:0,y:3}];
+                            const offset = offsets[i] || { x: 0, y: 0 };
+                            return (
+                                <div key={i} className="absolute w-[4.5%] aspect-square rounded-full border-2 border-white shadow-lg transition-all duration-700 z-20 flex items-center justify-center text-[8px] text-white font-black"
+                                    style={{ left:`${coords.x+offset.x}%`, top:`${coords.y+offset.y}%`, transform:'translate(-50%,-50%)', background: p.hex }}>
+                                    {i+1}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div className="flex-1 p-4 flex flex-col items-center justify-between">
+                    <div className="text-center w-full">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            ตาของ: <span style={{ color: currentPlayer.hex }}>{currentPlayer.name}</span>
+                            {isMyTurn && <span className="text-green-500"> (ตาคุณ!)</span>}
+                        </p>
+                        <Dice3D value={diceVal} rolling={isRolling} />
+                    </div>
+                    <div className="w-full space-y-3">
+                        <button onClick={rollDice}
+                            disabled={!isMyTurn || isRolling || !!showEffectModal || !!showTileZoom || !!showInviteModal}
+                            className={`w-full py-5 rounded-2xl font-black text-xl text-white shadow-xl active:scale-95 transition-all ${!isMyTurn ? 'bg-slate-300' : isRolling ? 'bg-slate-300' : 'bg-[#2D5A27]'}`}>
+                            {isRolling ? 'กำลังทอย...' : isOffline ? `ทอยลูกเต๋า (${currentPlayer.name})` : isMyTurn ? 'ทอยลูกเต๋า' : `รอ ${currentPlayer.name}...`}
+                        </button>
+                        <div className="log-container p-4 rounded-2xl text-white min-h-[80px]">
+                            <div className="text-[9px] uppercase font-bold text-green-300 mb-2">ประวัติการเล่น</div>
+                            <div className="space-y-1">
+                                {logs.map((log, i) => (
+                                    <div key={i} className={`text-[11px] ${i===0?'opacity-100':'opacity-40'}`}>• {log}</div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {showTileZoom && <TileZoomModal tile={showTileZoom.tile} player={showTileZoom.player} coord={showTileZoom.coord} tileIdx={showTileZoom.tileIdx} onDone={showTileZoom.onDone} />}
+
+                {showEffectModal && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-6">
+                        <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-xs text-center border-t-[12px] border-[#2D5A27]">
+                            <h2 className="text-xl font-black text-slate-800 mb-2">{showEffectModal.tile.name}</h2>
+                            <p className="text-sm text-slate-500 mb-8 font-bold leading-relaxed">{showEffectModal.tile.desc}</p>
+                            <button onClick={showEffectModal.onClose} className="w-full py-4 rounded-xl font-black text-white" style={{ background: showEffectModal.player.hex }}>ตกลง</button>
+                        </div>
+                    </div>
+                )}
+
+                {showInviteModal && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-6">
+                        <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-xs text-center border-t-[12px] border-[#2D5A27]">
+                            <p className="text-3xl mb-2">🤝</p>
+                            <h2 className="text-lg font-black text-slate-800 mb-1">ชวนเพื่อนใช้เกรซ</h2>
+                            <p className="text-sm text-slate-500 mb-5 font-bold leading-relaxed">เลือก 1 คน เดินหน้าพร้อมคุณ 1 ช่อง</p>
+                            <div className="space-y-2">
+                                {showInviteModal.players.map((p, i) => {
+                                    if (i === showInviteModal.playerIdx) return null;
+                                    return (
+                                        <button key={i} onClick={() => showInviteModal.onSelect(i)}
+                                            className="w-full py-3 rounded-xl font-black text-white flex items-center justify-center gap-3 text-sm active:scale-95 transition-all"
+                                            style={{ background: p.hex }}>
+                                            <span className="w-6 h-6 rounded-full bg-white/30 flex items-center justify-center text-xs font-black">{i+1}</span>
+                                            {p.name}
+                                            <span className="text-white/70 text-xs font-bold">(ช่องที่ {p.pos})</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    return null;
+};
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>
