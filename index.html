@@ -8,10 +8,10 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getDatabase, ref, set, onValue, update, get, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-
+    <!-- Firebase compat version: ใช้กับ React + Babel ในไฟล์ HTML เดียวบน GitHub Pages ได้เสถียรกว่า type="module" -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+    <script>
         const firebaseConfig = {
             apiKey: "AIzaSyCzvDunr2Fc6wFWud663I7gIyQD5mpImak",
             authDomain: "graczreplace.firebaseapp.com",
@@ -22,15 +22,32 @@
             appId: "1:607999774286:web:70cc5de78bbc49eebc7d1f"
         };
 
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
         window._firebaseDb = db;
-        window._firebaseRef = ref;
-        window._firebaseSet = set;
-        window._firebaseOnValue = onValue;
-        window._firebaseUpdate = update;
-        window._firebaseGet = get;
-        window._firebaseRunTransaction = runTransaction;
+        window._firebaseRef = function(path) {
+            return db.ref(path);
+        };
+        window._firebaseSet = function(refObj, val) {
+            return refObj.set(val);
+        };
+        window._firebaseUpdate = function(refObj, val) {
+            return refObj.update(val);
+        };
+        window._firebaseGet = function(refObj) {
+            return refObj.get();
+        };
+        window._firebaseOnValue = function(refObj, callback) {
+            refObj.on('value', callback);
+            return function() {
+                refObj.off('value', callback);
+            };
+        };
+        window._firebaseRunTransaction = function(refObj, fn) {
+            return refObj.transaction(fn);
+        };
+
         window._firebaseReady = true;
         window.dispatchEvent(new Event('firebaseReady'));
     </script>
@@ -89,7 +106,7 @@ const waitForFirebase = (cb) => {
     if (window._firebaseReady) cb();
     else window.addEventListener('firebaseReady', cb, { once: true });
 };
-const dbRef  = (path) => window._firebaseRef(window._firebaseDb, path);
+const dbRef  = (path) => window._firebaseRef(path);
 const dbSet  = (path, val) => window._firebaseSet(dbRef(path), val);
 const dbUpd  = (path, val) => window._firebaseUpdate(dbRef(path), val);
 const dbOn   = (path, cb) => window._firebaseOnValue(dbRef(path), snap => cb(snap.val()));
