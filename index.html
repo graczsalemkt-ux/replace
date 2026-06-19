@@ -8,34 +8,58 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getDatabase, ref, set, onValue, update, get, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+    <!-- Firebase compat version: ใช้กับ React + Babel ในไฟล์ HTML เดียวบน GitHub Pages -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyCzvDunr2Fc6wFWud663I7gIyQD5mpImak",
-            authDomain: "graczreplace.firebaseapp.com",
-            databaseURL: "https://graczreplace-default-rtdb.asia-southeast1.firebasedatabase.app",
-            projectId: "graczreplace",
-            storageBucket: "graczreplace.firebasestorage.app",
-            messagingSenderId: "607999774286",
-            appId: "1:607999774286:web:70cc5de78bbc49eebc7d1f"
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyCzvDunr2Fc6wFWud663I7gIyQD5mpImak",
+        authDomain: "graczreplace.firebaseapp.com",
+        databaseURL: "https://graczreplace-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "graczreplace",
+        storageBucket: "graczreplace.firebasestorage.app",
+        messagingSenderId: "607999774286",
+        appId: "1:607999774286:web:70cc5de78bbc49eebc7d1f"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    window._firebaseDb = db;
+
+    window._firebaseRef = function(path) {
+        return db.ref(path);
+    };
+
+    window._firebaseSet = function(refObj, val) {
+        return refObj.set(val);
+    };
+
+    window._firebaseUpdate = function(refObj, val) {
+        return refObj.update(val);
+    };
+
+    window._firebaseGet = function(refObj) {
+        return refObj.get();
+    };
+
+    window._firebaseOnValue = function(refObj, callback) {
+        refObj.on('value', callback);
+        return function() {
+            refObj.off('value', callback);
         };
+    };
 
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-        window._firebaseDb = db;
-        window._firebaseRef = ref;
-        window._firebaseSet = set;
-        window._firebaseOnValue = onValue;
-        window._firebaseUpdate = update;
-        window._firebaseGet = get;
-        window._firebaseRunTransaction = runTransaction;
-        window._firebaseReady = true;
-        window.dispatchEvent(new Event('firebaseReady'));
-    </script>
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;700;900&display=swap" rel="stylesheet">
-    <style>
+    window._firebaseRunTransaction = function(refObj, fn) {
+        return refObj.transaction(fn);
+    };
+
+    window._firebaseReady = true;
+    window.dispatchEvent(new Event('firebaseReady'));
+
+    console.log("GRACZ REPLACE FIXED VERSION 100");
+</script>
         body { font-family: 'Kanit', sans-serif; background: #f0f4f0; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
         .scene { width: 80px; height: 80px; perspective: 600px; margin: 15px auto; }
         .dice { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 1.2s cubic-bezier(0.15, 0.85, 0.35, 1.2); }
